@@ -382,8 +382,9 @@ Available endpoints:
 | `GET /tiles/<layer>/<z>/<x>/<y>.pbf`               | MVT vector tiles (`stib_lines`, `stib_stops`)        |
 | `GET /debug/counts`                                | Row counts per table (debug)                        |
 
-De Lijn endpoints (`/api/delijn/...`) and other domains (TomTom, Waze,
-ANPR, traffic-light, FLIR) return empty stubs — see §9.
+Anything not listed (`/api/delijn/...`, `/api/traffic-lights`,
+`/api/fid/...`, etc.) is not implemented locally and returns a Flask
+404. See §9.
 
 ---
 
@@ -432,14 +433,15 @@ Then re-run the relevant ingestor.
 
 **Removed** (out of scope or dependent on credentialed external APIs):
 
-- De Lijn, TomTom, Waze, ANPR, traffic-light, FLIR — endpoints kept as
-  empty stubs so the upstream frontend can still talk to the server
+- De Lijn, TomTom, Waze, ANPR, traffic-light, FLIR — backend routes
+  removed entirely. The frontend still references some of these layers
+  but their fetches now return 404; the affected UI panels degrade
+  silently. A full frontend trim is planned next.
 - Azure / Kafka ingestors (ANPR, Magneto, …)
 - SSH/QGIS tunnel and corporate network configuration
 - The upstream `index.html` (≈5300 lines) is kept almost verbatim — the
-  local copy is ~5265 lines, with Mapbox GL JS swapped for MapLibre GL JS
-  (drop-in compatible) and the De Lijn / cameras / traffic-light layers
-  silently hidden when their stub endpoints return empty
+  local copy is ~5265 lines, with Mapbox GL JS swapped for MapLibre
+  GL JS (drop-in compatible).
 
 ---
 

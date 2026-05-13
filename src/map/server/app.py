@@ -13,14 +13,6 @@ from .config import ServerConfig
 from .context import MapAppContext, Pool
 from .queries.layer_sql import LAYER_SQL, LINE_FILTERED_LAYERS
 from .services.counts import fetch_counts, fetch_health
-from .services.delijn_service import (
-    fetch_delijn_alerts,
-    fetch_delijn_lines_catalog,
-    fetch_delijn_live_positions,
-    fetch_delijn_shape,
-    fetch_delijn_stop_details,
-    fetch_delijn_trajectories,
-)
 from .services.search import fetch_search_results
 from .services.stib_service import (
     fetch_stib_alerts,
@@ -68,7 +60,7 @@ def create_app(cfg: ServerConfig, pool: Pool) -> Flask:
 
     @app.after_request
     def _cache_shapes(resp):
-        if request.path.startswith("/api/stib/shape/") or request.path.startswith("/api/delijn/shape/"):
+        if request.path.startswith("/api/stib/shape/"):
             if resp.status_code == 200:
                 resp.headers["Cache-Control"] = "public, max-age=86400"
         return resp
@@ -166,47 +158,6 @@ def create_app(cfg: ServerConfig, pool: Pool) -> Flask:
         except Exception as exc:
             return _err(exc)
 
-    # ── De Lijn API (empty stubs) ─────────────────────────────────────
-    @app.route("/api/delijn/lines")
-    def delijn_lines_catalog():
-        return jsonify(fetch_delijn_lines_catalog(ctx))
-
-    @app.route("/api/delijn/live-positions")
-    def delijn_live_positions():
-        query = request.query_string.decode("utf-8")
-        tf = parse_time_filter(query, ctx.cfg.default_hours)
-        lines = parse_lines_filter(request.args.get("lines"))
-        dir_raw = (request.args.get("direction") or "").strip()
-        direction = int(dir_raw) if dir_raw else None
-        return jsonify(fetch_delijn_live_positions(ctx, lines, tf, direction))
-
-    @app.route("/api/delijn/trajectories")
-    def delijn_trajectories():
-        query = request.query_string.decode("utf-8")
-        tf = parse_time_filter(query, ctx.cfg.default_hours)
-        lines = parse_lines_filter(request.args.get("lines"))
-        sample = request.args.get("sample", "5 seconds")
-        dir_raw = (request.args.get("direction") or "").strip()
-        direction = int(dir_raw) if dir_raw else None
-        return jsonify(fetch_delijn_trajectories(ctx, lines, tf, sample, direction))
-
-    @app.route("/api/delijn/shape/<route_id>/<direction_id>")
-    def delijn_shape(route_id: str, direction_id: str):
-        return jsonify(fetch_delijn_shape(ctx, route_id, direction_id))
-
-    @app.route("/api/delijn/stop/<stop_id>")
-    def delijn_stop_details(stop_id: str):
-        return jsonify(fetch_delijn_stop_details(ctx, stop_id))
-
-    @app.route("/api/delijn/alerts")
-    def delijn_alerts():
-        query = request.query_string.decode("utf-8")
-        tf = parse_time_filter(query, ctx.cfg.default_hours)
-        lines = parse_lines_filter(request.args.get("lines"))
-        alert_type = request.args.get("type") or None
-        active_only = request.args.get("active", "").lower() in ("1", "true")
-        return jsonify(fetch_delijn_alerts(ctx, lines, tf, alert_type, active_only))
-
     # ── Local-only: waiting times ─────────────────────────────────────
     @app.route("/api/waiting-times")
     def waiting_times():
@@ -240,14 +191,5 @@ def create_app(cfg: ServerConfig, pool: Pool) -> Flask:
         resp.headers["Content-Type"] = "application/vnd.mapbox-vector-tile"
         resp.headers["Cache-Control"] = "public, max-age=300"
         return resp
-
-    # ── Non-Transport stubs (silent so the upstream UI doesn't error) ──
-    @app.route("/api/geolink-segments")
-    @app.route("/api/traffic-lights")
-    @app.route("/api/fid/<path:_>")
-    @app.route("/api/traffic-light/<path:_>")
-    @app.route("/api/xtream-camera/<path:_>")
-    def _not_implemented(_=None):
-        return jsonify({"ok": True, "results": [], "features": []}), 200
 
     return app

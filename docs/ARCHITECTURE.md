@@ -761,26 +761,27 @@ only consumer.
 | `GET /api/stib/alerts`                             | [stib_service.py:505](../src/map/server/services/stib_service.py) (always empty)    | [index.html:3553](../src/map/templates/index.html)                    |
 | `GET /api/waiting-times?pointid=…`                 | [waiting_times.py:13](../src/map/server/services/waiting_times.py)                  | stop popup                                                            |
 | `GET /tiles/<layer>/<z>/<x>/<y>.pbf`               | [tiles.py:43](../src/map/server/services/tiles.py)                                  | [index.html:1519, 3207, 4393](../src/map/templates/index.html)        |
-| `GET /api/delijn/...`                              | [delijn_service.py](../src/map/server/services/delijn_service.py) (all empty stubs) | matches upstream frontend; lets the De Lijn toggle render harmlessly  |
-| `GET /api/geolink-segments` etc.                   | [app.py:245-251](../src/map/server/app.py) (silent `{ok:true, results:[]}`)         | upstream traffic / camera UI panes                                    |
 
-Three contract details worth noting:
+Any other endpoint the upstream frontend asks for (e.g.
+`/api/delijn/*`, `/api/traffic-lights`, `/api/fid/...`,
+`/api/xtream-camera/...`) now returns a Flask 404. The frontend's
+`fetch().catch()` handlers degrade silently; the corresponding UI
+panels render empty.
+
+Two contract details worth noting:
 
 - `/api/stib/trajectories` returns
   `{trips: [...], window_start_ms, window_end_ms}` — the `_ms` fields
-  are what the player uses to position the scrubber. Even the
-  *empty* De Lijn stub returns those fields
-  ([delijn_service.py:36-49](../src/map/server/services/delijn_service.py))
-  because the frontend reads them unconditionally.
+  are what the player uses to position the scrubber, even when `trips`
+  is empty.
 - `/api/stib/lines` returns `directions_detail` (top-4 destinations
   ranked by trip count over the last 7 days)
-  ([stib_service.py:40-77](../src/map/server/services/stib_service.py)).
+  ([stib_service.py:30-115](../src/map/server/services/stib_service.py)).
   The "7 days" are anchored on `MAX(end_ts)`, again for offline-replay
   parity with the relative-time-mode logic.
 - Tile layers other than `stib_lines` / `stib_stops` return HTTP 204
-  ([app.py:226-229](../src/map/server/app.py)) — that's how the
-  upstream frontend can keep requesting `magneto_*`, `delijn_*`, etc.
-  without flooding the console.
+  ([app.py](../src/map/server/app.py)) — keeps the frontend's MapLibre
+  source requests for layers that never had local data quiet.
 
 ---
 
@@ -879,13 +880,13 @@ Two reasons:
    load_stib.py", you can `Ctrl-Click` the same filename and read
    the local version. The shadow layout is documentation.
 
-The cost is some empty-ish files (e.g. `rt.stib_trip_open` exists
-but stays empty) and the De Lijn / TomTom stubs at
-[delijn_service.py](../src/map/server/services/delijn_service.py).
-Those stubs are worth keeping: the upstream `index.html`
-unconditionally fetches `/api/delijn/trajectories` to position its
-scrubber; returning a well-formed empty `FeatureCollection` keeps the
-SPA initializing instead of crashing on `undefined.window_start_ms`.
+The cost is some empty-ish artefacts (e.g. `rt.stib_trip_open` exists
+but stays empty locally because we don't run a real-time trip
+stitcher). Out-of-scope domains (De Lijn, TomTom, Waze, ANPR,
+traffic-light, FLIR) used to ship as empty backend stubs but were
+removed in a later pass — the upstream `index.html` still references
+them, but its `fetch().catch()` paths swallow the 404s and the
+affected UI panels render empty.
 
 ### Q. Why no Docker?
 
@@ -1014,8 +1015,6 @@ so you can re-walk the data flow with a single side-by-side viewer.
   — unified search over `static.stib_stop` + `static.stib_line_shape`.
 - [src/map/server/services/waiting_times.py](../src/map/server/services/waiting_times.py)
   — popup ETAs from `transport_local.stib_waiting_time`.
-- [src/map/server/services/delijn_service.py](../src/map/server/services/delijn_service.py)
-  — empty stubs for the De Lijn endpoints.
 
 ### Schema
 - [sql/schema.sql](../sql/schema.sql) — three schemas, six tables,
