@@ -5,7 +5,7 @@ Static steps (one-shot, populate `static.stib_*`):
     lines    → stops_by_line_ingestor.run
     shapes   → gtfs_shapes_ingestor.run
 
-Real-time step (poll the ODP, populate `rt_v2.stib_vehicle_position`):
+Real-time step (poll the ODP, populate `rt.stib_vehicle_position`):
     rt       → vehicle_positions_ingestor.run (one-shot or looped)
 
 Run with:

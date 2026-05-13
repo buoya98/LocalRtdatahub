@@ -25,10 +25,10 @@ no Azure managed identities.
 The whole stack is:
 
 - **PostgreSQL 18 + PostGIS 3.6 + MobilityDB** holding three schemas
-  (`static`, `rt_v2`, `transport_local`) defined by
+  (`static`, `rt`, `transport_local`) defined by
   [sql/schema.sql](../sql/schema.sql).
 - **Two interchangeable ingestion paths** that both end up writing the
-  same rows into `rt_v2.stib_vehicle_position`: a live STIB Open Data
+  same rows into `rt.stib_vehicle_position`: a live STIB Open Data
   Portal poller and a bench replayer for gzipped JSONL / CSV dumps.
 - **One SQL transform** that turns a (lineid, direction, pointid,
   distanceFromPoint) tuple into a real GPS point using PostGIS, since
@@ -68,20 +68,20 @@ The whole stack is:
                           └─────────────────┬─────────────────────┘
                                             │
                           ┌─────────────────▼─────────────────────┐
-                          │ rt_v2.stib_vehicle_position           │
+                          │ rt.stib_vehicle_position           │
                           │ (one row per observed vehicle ping)   │
                           └─────────────────┬─────────────────────┘
                                             │
                           ┌─────────────────▼─────────────────────┐
                           │ src/etl/pipeline/load/                │
-                          │   load_stib_v2.py                     │
+                          │   load_stib.py                     │
                           │ greedy spatial+temporal grouping →    │
                           │ MobilityDB tgeompoint trajectories    │
                           └─────────────────┬─────────────────────┘
                                             │
                           ┌─────────────────▼─────────────────────┐
-                          │ rt_v2.stib_trip / rt_v2.stib_trip_open│
-                          │ unioned by view rt_v2.stib_trip_all   │
+                          │ rt.stib_trip / rt.stib_trip_open│
+                          │ unioned by view rt.stib_trip_all   │
                           └─────────────────┬─────────────────────┘
                                             │
                           ┌─────────────────▼─────────────────────┐
@@ -130,52 +130,52 @@ This is why running `shapes` before `lines` is a no-op (the LEFT JOIN
 finds nothing — [gtfs_shapes_ingestor.py:91-94](../src/etl/ingestion/stib/gtfs_shapes_ingestor.py)
 bails out explicitly).
 
-### Schema `rt_v2` — observations + reconstructed trips
+### Schema `rt` — observations + reconstructed trips
 
-`rt_v2` is the upstream "shadow" schema, kept under that exact name to
+`rt` is the upstream "shadow" schema, kept under that exact name to
 stay drop-in compatible with upstream's queries.
 
 ```
-                              rt_v2.stib_vehicle_position
+                              rt.stib_vehicle_position
                                   (sql/schema.sql:73-86)
                                           │
-                                          │ load_stib_v2.py
+                                          │ load_stib.py
                                           │ greedy (lineid, direction)
                                           ▼
         ┌───────────────────────────┐         ┌────────────────────────────┐
-        │ rt_v2.stib_trip_open      │         │ rt_v2.stib_trip            │
+        │ rt.stib_trip_open      │         │ rt.stib_trip            │
         │ (sql/schema.sql:95-112)   │         │ (sql/schema.sql:114-130)   │
         │ trips still being         │         │ closed/finalised trips     │
-        │ extended in real time     │         │ (target of load_stib_v2)   │
+        │ extended in real time     │         │ (target of load_stib)   │
         │ — UNUSED locally          │         │                            │
         └────────────┬──────────────┘         └─────────────┬──────────────┘
                      │                                      │
                      └────────────── UNION ALL ─────────────┘
                                           │
                                           ▼
-                              rt_v2.stib_trip_all (VIEW)
+                              rt.stib_trip_all (VIEW)
                                   (sql/schema.sql:132-140)
 ```
 
-- `rt_v2.stib_vehicle_position`
+- `rt.stib_vehicle_position`
   ([sql/schema.sql:73-86](../sql/schema.sql)): one row per (lineid,
   direction, pointid, distance, fetched_at) observation. Primary key is
   the deterministic `position_id` (SHA-256 truncated to 32 hex chars,
   see §3). Geometry is the *reconstructed* Point — when ingested
   through the SQL transform, no Python ever sees the GPS coords.
-- `rt_v2.stib_trip` ([sql/schema.sql:114-130](../sql/schema.sql)):
+- `rt.stib_trip` ([sql/schema.sql:114-130](../sql/schema.sql)):
   closed trips produced by
-  [load_stib_v2.py](../src/etl/pipeline/load/load_stib_v2.py). The
+  [load_stib.py](../src/etl/pipeline/load/load_stib.py). The
   `trip` column is a MobilityDB `tgeompoint` — a
   *temporal geometry* you can query with `valueAtTimestamp(trip, ts)`.
-- `rt_v2.stib_trip_open` ([sql/schema.sql:95-112](../sql/schema.sql)):
+- `rt.stib_trip_open` ([sql/schema.sql:95-112](../sql/schema.sql)):
   schema-compatible with upstream's online trip builder but
-  unpopulated locally — `load_stib_v2.py` flushes everything as a
+  unpopulated locally — `load_stib.py` flushes everything as a
   closed trip
-  ([load_stib_v2.py:171-175](../src/etl/pipeline/load/load_stib_v2.py)).
+  ([load_stib.py:171-175](../src/etl/pipeline/load/load_stib.py)).
   It's kept so upstream-style frontend queries don't have to switch
   tables.
-- `rt_v2.stib_trip_all` ([sql/schema.sql:132-140](../sql/schema.sql)):
+- `rt.stib_trip_all` ([sql/schema.sql:132-140](../sql/schema.sql)):
   a `UNION ALL` view that hides the open/closed split from the Flask
   service. Every `/api/stib/...` query reads from this view, never
   from the two underlying tables — see
@@ -198,7 +198,7 @@ serves waiting times from a separate Azure Service Bus pipeline.
 
 The whole point of the design is that **two completely different input
 formats end up writing byte-identical rows** to
-`rt_v2.stib_vehicle_position`. Idempotency is provided by the
+`rt.stib_vehicle_position`. Idempotency is provided by the
 deterministic `position_id`.
 
 ### 3.a — Live API path (STIB Open Data Portal)
@@ -332,7 +332,7 @@ Why this exact concatenation:
   path produce duplicate rows").
 - The hash is truncated to 32 hex chars (128 bits) — wide enough that
   collisions among a few million daily observations are effectively
-  impossible, narrow enough to keep `rt_v2.stib_vehicle_position.position_id`
+  impossible, narrow enough to keep `rt.stib_vehicle_position.position_id`
   a comfortable `TEXT PRIMARY KEY`.
 
 The `ON CONFLICT (position_id) DO NOTHING` clause at
@@ -447,19 +447,19 @@ but `/debug/counts` reports `positions: 0`.
 
 ## 5. Trip reconstruction
 
-`rt_v2.stib_vehicle_position` holds raw observations. To play a vehicle
+`rt.stib_vehicle_position` holds raw observations. To play a vehicle
 back through time the frontend needs *trip identity*: "this stream of
 points is one bus". The STIB feed gives us no `vehicle_uuid`, so we
 have to **rebuild identity** with a greedy
 spatio-temporal heuristic.
 
 That's the job of
-[src/etl/pipeline/load/load_stib_v2.py](../src/etl/pipeline/load/load_stib_v2.py).
+[src/etl/pipeline/load/load_stib.py](../src/etl/pipeline/load/load_stib.py).
 
 ### Algorithm
 
 Three tunables, kept identical to upstream
-([load_stib_v2.py:48-50](../src/etl/pipeline/load/load_stib_v2.py)):
+([load_stib.py:48-50](../src/etl/pipeline/load/load_stib.py)):
 
 ```
 MATCH_RADIUS_M = 500.0      # two consecutive pings within 500 m = same vehicle
@@ -468,27 +468,27 @@ TRIP_TIMEOUT_S = 1800       # 30 min idle = trip closed
 ```
 
 Per (lineid, direction) pair
-([load_stib_v2.py:178-196](../src/etl/pipeline/load/load_stib_v2.py)):
+([load_stib.py:178-196](../src/etl/pipeline/load/load_stib.py)):
 
 1. Stream all positions ordered by `fetched_at`
-   ([load_stib_v2.py:199-214](../src/etl/pipeline/load/load_stib_v2.py)
+   ([load_stib.py:199-214](../src/etl/pipeline/load/load_stib.py)
    — uses a server-side cursor so even multi-million-row tables stay
    memory-light).
 2. Keep a list of *open trips*. For each new (ts, lon, lat):
    a. Expire trips idle for more than `TRIP_TIMEOUT_S`
-      ([load_stib_v2.py:150-156](../src/etl/pipeline/load/load_stib_v2.py)).
+      ([load_stib.py:150-156](../src/etl/pipeline/load/load_stib.py)).
    b. Among the remaining open trips, score each one by haversine
       distance to its last point
-      ([load_stib_v2.py:92-101](../src/etl/pipeline/load/load_stib_v2.py)).
+      ([load_stib.py:92-101](../src/etl/pipeline/load/load_stib.py)).
       Reject any trip whose last ping is more than `MATCH_WINDOW_S`
       ago, whose timestamp would not be strictly increasing (MobilityDB
       requirement), or whose last ping is more than `MATCH_RADIUS_M`
       away.
    c. Attach to the *closest* surviving trip, or open a new one
-      ([load_stib_v2.py:166-169](../src/etl/pipeline/load/load_stib_v2.py)).
+      ([load_stib.py:166-169](../src/etl/pipeline/load/load_stib.py)).
 3. After the stream ends, flush all open trips and drop any that ended
    up with fewer than 2 samples
-   ([load_stib_v2.py:171-175](../src/etl/pipeline/load/load_stib_v2.py)).
+   ([load_stib.py:171-175](../src/etl/pipeline/load/load_stib.py)).
    Singletons can't form a `tgeompoint` sequence anyway.
 
 The choice of *closest* (not *first matching*) means a temporary
@@ -506,7 +506,7 @@ serialized as
 [Point(lon₁ lat₁)@ts₁, Point(lon₂ lat₂)@ts₂, …]
 ```
 
-(see [load_stib_v2.py:69-75](../src/etl/pipeline/load/load_stib_v2.py)).
+(see [load_stib.py:69-75](../src/etl/pipeline/load/load_stib.py)).
 This unlocks three killer operators that the Flask service uses
 extensively:
 
@@ -646,7 +646,7 @@ massivement la fluidité de la map"). What changed:
 
 | Endpoint                       | Old approach                                                   | New approach                                                                                                                            | Upstream-measured speedup            |
 | ------------------------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `/api/stib/lines`              | ~73 correlated subqueries (one per line)                       | 1 grouped scan + ROW_NUMBER over `rt_v2.stib_trip_all` ([stib_service.py:30-115](../src/map/server/services/stib_service.py))           | 29 s cold / 3.5 s warm → 1.1 s / 2 ms |
+| `/api/stib/lines`              | ~73 correlated subqueries (one per line)                       | 1 grouped scan + ROW_NUMBER over `rt.stib_trip_all` ([stib_service.py:30-115](../src/map/server/services/stib_service.py))           | 29 s cold / 3.5 s warm → 1.1 s / 2 ms |
 | `/api/stib/live-positions`     | `tstzspan && span(...)` only — required BitmapAnd of two idx   | Adds `start_ts <= … AND end_ts >= …` *before* the tstzspan check → composite (lineid, start_ts) index hit                              | 3.4 s → 22 ms (no filter)            |
 | `/api/stib/trajectories`       | `generate_series + valueAtTimestamp` resample every 5 s         | `unnest(instants(atTime(trip, span(...))))` emits one row per **native** GPS fix; client linearly interpolates between                  | 12 s/32 s → 100 ms/230 ms             |
 
@@ -656,8 +656,8 @@ Three supporting tactics:
    compilation costs ~600 ms on these queries (estimated cost above the
    default `jit_above_cost = 100k`) but the queries themselves run in
    1-2 s — net negative.
-2. **Composite index** `idx_v2_stib_trip_lineid_start ON
-   rt_v2.stib_trip(lineid, start_ts DESC)` (plus the same on
+2. **Composite index** `idx_stib_trip_lineid_start ON
+   rt.stib_trip(lineid, start_ts DESC)` (plus the same on
    `stib_trip_open`) — see
    [sql/schema.sql:130-138](../sql/schema.sql). Without it the new
    `start_ts <=`/`end_ts >=` predicate can still be planned, but a
@@ -694,7 +694,7 @@ service. Two modes:
 | `relative` | otherwise                                   | `{"mode": "relative", "hours": h, "start": None, "end": None}` ([time_utils.py:44](../src/map/server/utils/time_utils.py)) |
 
 In **relative** mode the reference instant isn't `now()` — it's
-`MAX(end_ts)` of `rt_v2.stib_trip_all`
+`MAX(end_ts)` of `rt.stib_trip_all`
 ([stib_service.py:271-280](../src/map/server/services/stib_service.py)).
 That's deliberate: when you replay a bench dump from last week, "now"
 in DB-time is last week's last observation, not the wall clock. Using
@@ -794,9 +794,9 @@ counts are the canonical pulse:
 - `line_shapes == 0` → never ran `gtfs_shapes_ingestor`; transform
   drops everything (no line + no stop = WHERE clause filters it out at
   [stib_transform.py:90](../src/etl/pipeline/transform/stib_transform.py)).
-- `positions > 0` but `trips == 0` → forgot `load_stib_v2`. The
+- `positions > 0` but `trips == 0` → forgot `load_stib`. The
   position table is full but the map is empty because the Flask
-  service reads from `rt_v2.stib_trip_all`, not from
+  service reads from `rt.stib_trip_all`, not from
   `stib_vehicle_position`.
 - `waiting_times == 0` → expected unless you ingested `wt.jsonl.gz`.
 
@@ -809,7 +809,7 @@ The four LEFT JOINs that *can* drop data without raising:
 | [stib_transform.py:51-53](../src/etl/pipeline/transform/stib_transform.py): `LEFT JOIN static.stib_line_terminus` | A new line not yet in the terminus catalogue ⇒ `dir_label = NULL` ⇒ the next join can't find a shape ⇒ falls back to the stop geom. |
 | [stib_transform.py:61-62](../src/etl/pipeline/transform/stib_transform.py): `LEFT JOIN static.stib_line_shape`   | No shape for this (lineid, direction) ⇒ anchor fallback or row dropped.                                              |
 | [stib_transform.py:63-64](../src/etl/pipeline/transform/stib_transform.py): `LEFT JOIN static.stib_stop`         | No stop in catalogue (most common: ran `rt` before `stops`) ⇒ row dropped.                                           |
-| [load_stib_v2.py:171-175](../src/etl/pipeline/load/load_stib_v2.py): singleton trips                            | Trips with `<2` samples are dropped (MobilityDB doesn't accept a bracketed sequence with one instant).               |
+| [load_stib.py:171-175](../src/etl/pipeline/load/load_stib.py): singleton trips                            | Trips with `<2` samples are dropped (MobilityDB doesn't accept a bracketed sequence with one instant).               |
 
 None of these raise — they just silently lower the count. That's why
 `/debug/counts` is the first thing to check.
@@ -826,7 +826,7 @@ In order:
 4. Inspect the JS console: tile 204s for `stib_lines` mean you have no
    `static.stib_line_shape` rows.
 5. If `positions > 0` but `trips == 0`, run
-   `python -m src.etl.pipeline.load.load_stib_v2`.
+   `python -m src.etl.pipeline.load.load_stib`.
 
 ---
 
@@ -837,7 +837,7 @@ In order:
 `requirements.txt` already pins `psycopg2-binary` for the ingestion
 scripts (see imports at
 [bench/ingestor.py:44-45](../src/etl/ingestion/bench/ingestor.py),
-[load_stib_v2.py:36](../src/etl/pipeline/load/load_stib_v2.py),
+[load_stib.py:36](../src/etl/pipeline/load/load_stib.py),
 [stib_transform.py:24](../src/etl/pipeline/transform/stib_transform.py)).
 Adding psycopg3 just so the web server can use `psycopg_pool` would
 mean **two database drivers in the same venv** — different escape
@@ -857,10 +857,10 @@ Two reasons:
    applies to the same path here. Renaming files would break that.
 2. **Discussion and tickets transfer.** When you read a commit message
    from RTDataHub mentioning "trip_open dual-table dance in
-   load_stib_v2.py", you can `Ctrl-Click` the same filename and read
+   load_stib.py", you can `Ctrl-Click` the same filename and read
    the local version. The shadow layout is documentation.
 
-The cost is some empty-ish files (e.g. `rt_v2.stib_trip_open` exists
+The cost is some empty-ish files (e.g. `rt.stib_trip_open` exists
 but stays empty) and the De Lijn / TomTom stubs at
 [delijn_service.py](../src/map/server/services/delijn_service.py).
 Those stubs are worth keeping: the upstream `index.html`
@@ -877,15 +877,15 @@ PostgreSQL/PostGIS performance on the host (the GIST indexes on
 one-shot `make install`; Docker would add an image-build step *and* a
 container that still has to bind-mount the database volume.
 
-### Q. Why is `rt_v2.stib_trip_open` empty locally?
+### Q. Why is `rt.stib_trip_open` empty locally?
 
 Upstream uses it as a hot-write target: real-time trips are extended
 in `stib_trip_open` and only moved to `stib_trip` once finalised. The
-local `load_stib_v2.py` runs in batch mode over a fully-loaded
+local `load_stib.py` runs in batch mode over a fully-loaded
 position table, so by the time we write anything, every trip is
 already "closed". We flush everything to `stib_trip` directly
-([load_stib_v2.py:171-175](../src/etl/pipeline/load/load_stib_v2.py))
-and rely on the `rt_v2.stib_trip_all` view
+([load_stib.py:171-175](../src/etl/pipeline/load/load_stib.py))
+and rely on the `rt.stib_trip_all` view
 ([sql/schema.sql:132-140](../sql/schema.sql)) to keep the query
 surface identical to upstream's bicephalous layout.
 
@@ -929,8 +929,8 @@ day. This matches upstream's convention and means a single bus
 finishing its night at 02:45 keeps the same per-day sequence number
 as the trip that started it.
 
-`load_stib_v2.py` stores `line_trip_id = NULL`
-([load_stib_v2.py:128-134](../src/etl/pipeline/load/load_stib_v2.py))
+`load_stib.py` stores `line_trip_id = NULL`
+([load_stib.py:128-134](../src/etl/pipeline/load/load_stib.py))
 because computing it at write-time would be lying — the value depends
 on the day-boundary rule, which is a presentation choice.
 
@@ -970,7 +970,7 @@ so you can re-walk the data flow with a single side-by-side viewer.
 - [src/etl/pipeline/transform/stib_transform.py](../src/etl/pipeline/transform/stib_transform.py)
   — deterministic `position_id`, `_INSERT_SQL` with
   `ST_LineLocatePoint` + `ST_LineInterpolatePoint` + anchor fallback.
-- [src/etl/pipeline/load/load_stib_v2.py](../src/etl/pipeline/load/load_stib_v2.py)
+- [src/etl/pipeline/load/load_stib.py](../src/etl/pipeline/load/load_stib.py)
   — greedy trip reconstruction, `_OpenTrip`, `_format_tgeompoint`.
 
 ### Web serving

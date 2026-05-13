@@ -2,14 +2,14 @@
 
 Auto-detects file type from filename:
 
-  * assignments.csv.gz             → rt_v2.stib_vehicle_position
+  * assignments.csv.gz             → rt.stib_vehicle_position
         Columns: position_id, fetched_at_utc, timestamp_s, lineId,
                  direction, pointId, distance, latitude, longitude, obs_id
         These rows already carry resolved lat/lon, so we insert them with
         ST_MakePoint(lon, lat). Observed pointids are upserted into
         static.stib_stop as a side-effect (best-effort centroid).
 
-  * positions/*.jsonl.gz           → rt_v2.stib_vehicle_position
+  * positions/*.jsonl.gz           → rt.stib_vehicle_position
         Raw STIB feed: {poll_ts, lineid, directionId, pointId,
                         distanceFromPoint} — no GPS. Geom is reconstructed
         in SQL from static.stib_line_shape + static.stib_stop via
@@ -105,7 +105,7 @@ def _parse_ts(value: str | None) -> datetime | None:
 
 def ingest_assignments(conn, path: Path) -> int:
     insert_sql = """
-        INSERT INTO rt_v2.stib_vehicle_position (
+        INSERT INTO rt.stib_vehicle_position (
             position_id, vehicle_uuid, lineid, direction, pointid,
             distance_from_point, fetched_at, geom
         ) VALUES %s
@@ -233,7 +233,7 @@ def ingest_waiting_times(conn, path: Path) -> int:
 
 
 def ingest_raw_positions(conn, path: Path) -> int:
-    """positions/*.jsonl.gz → rt_v2.stib_vehicle_position via transform.
+    """positions/*.jsonl.gz → rt.stib_vehicle_position via transform.
 
     The raw feed has no GPS — geom is reconstructed in SQL from
     static.stib_line_shape + static.stib_stop. Records whose stop or line

@@ -7,8 +7,8 @@ Reads from:
   * static.stib_line_shape, static.stib_line_stops, static.stib_line_terminus
     (populated by src/etl/ingestion/stib/)
   * static.stib_stop  (populated by both ingestion paths)
-  * rt_v2.stib_trip_all  (populated by src/etl/pipeline/load/load_stib_v2.py)
-  * rt_v2.stib_vehicle_position  (populated by src/etl/ingestion/bench/)
+  * rt.stib_trip_all  (populated by src/etl/pipeline/load/load_stib.py)
+  * rt.stib_vehicle_position  (populated by src/etl/ingestion/bench/)
 """
 from __future__ import annotations
 
@@ -45,12 +45,12 @@ _LINES_CATALOG_SQL = """
          WHERE ls.destination IS NOT NULL
          GROUP BY ls.lineid
     ),
-    -- Single global scan of rt_v2.stib_trip_all over the last 7 days,
+    -- Single global scan of rt.stib_trip_all over the last 7 days,
     -- joined once to the static lookup tables. Replaces N+1 correlated
     -- subqueries (~73 line loops in upstream's data, ~257k heap pages).
     cutoff AS (
         SELECT GREATEST(MAX(end_ts) - INTERVAL '7 days', MIN(start_ts)) AS t
-          FROM rt_v2.stib_trip_all
+          FROM rt.stib_trip_all
     ),
     trip_term AS (
         SELECT
@@ -58,7 +58,7 @@ _LINES_CATALOG_SQL = """
             t.direction,
             COALESCE(lt.destination, sp.stop_name_fr) AS destination,
             COUNT(*) AS trips
-          FROM rt_v2.stib_trip_all t
+          FROM rt.stib_trip_all t
           CROSS JOIN cutoff c
           LEFT JOIN static.stib_line_terminus lt
                  ON lt.lineid = t.lineid
@@ -283,7 +283,7 @@ _LIVE_POSITIONS_SQL = """
                    ORDER BY t.start_ts, t.trip_id
                )::text, 3, '0') AS line_trip_id,
                valueAtTimestamp(t.trip, w.at_ts) AS pt
-          FROM rt_v2.stib_trip_all t
+          FROM rt.stib_trip_all t
           CROSS JOIN win w
          WHERE (%s::text[] IS NULL OR t.lineid = ANY(%s::text[]))
            AND (%s::int    IS NULL OR t.direction = %s::int)
@@ -323,7 +323,7 @@ def _resolve_at_ts(ctx: MapAppContext, time_filter: dict[str, Any] | None) -> da
     # to a meaningful instant (instead of "now()" which leaves no active trips).
     with ctx.pool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT MAX(end_ts) FROM rt_v2.stib_trip_all;")
+            cur.execute("SELECT MAX(end_ts) FROM rt.stib_trip_all;")
             row = cur.fetchone()
     return (row and row[0]) or datetime.now(timezone.utc)
 
@@ -397,7 +397,7 @@ _TRAJECTORIES_SQL = """
                (SELECT ls.direction FROM static.stib_line_stops ls
                  WHERE ls.lineid = t.lineid AND ls.pointid = t.direction::text
                  ORDER BY ls.sequence_idx DESC LIMIT 1) AS dir_label
-          FROM rt_v2.stib_trip_all t
+          FROM rt.stib_trip_all t
           CROSS JOIN win w
          WHERE (%s::text[] IS NULL OR t.lineid = ANY(%s::text[]))
            AND (%s::int    IS NULL OR t.direction = %s::int)

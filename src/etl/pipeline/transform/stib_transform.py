@@ -1,8 +1,8 @@
 """STIB position transform — resolve (lineid, direction, pointid, distance)
-into a GPS point and insert into rt_v2.stib_vehicle_position.
+into a GPS point and insert into rt.stib_vehicle_position.
 
 Mirrors the role of source/src/etl/pipeline/transform/stib_transform.py
-(the "v2 shape-based interp"), but does the geometry math in PostGIS
+(shape-based interpolation), but does the geometry math in PostGIS
 rather than walking the polyline in Python:
 
     fraction_at_stop = ST_LineLocatePoint(line_geom, stop_geom)
@@ -75,7 +75,7 @@ geom_resolved AS (
       LEFT JOIN static.stib_stop sp
              ON sp.pointid = r.pointid
 )
-INSERT INTO rt_v2.stib_vehicle_position
+INSERT INTO rt.stib_vehicle_position
     (position_id, vehicle_uuid, lineid, direction, pointid,
      distance_from_point, fetched_at, geom)
 SELECT g.position_id,
@@ -155,7 +155,7 @@ def _coerce(rec: dict[str, Any]) -> tuple | None:
 
 def insert_positions(conn, records: Iterable[dict[str, Any]],
                      batch_size: int = 5000) -> int:
-    """Insert position dicts into rt_v2.stib_vehicle_position with geom
+    """Insert position dicts into rt.stib_vehicle_position with geom
     computed in SQL. Returns the number of *new* rows inserted (excludes
     ON CONFLICT skips). Caller is responsible for `conn.commit()`."""
     batch: list[tuple] = []

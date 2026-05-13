@@ -1,7 +1,7 @@
-"""Reconstruct distinct STIB vehicle trips from rt_v2.stib_vehicle_position.
+"""Reconstruct distinct STIB vehicle trips from rt.stib_vehicle_position.
 
-Mirrors source/src/etl/pipeline/load/load_stib_v2.py at the schema level
-(produces rt_v2.stib_trip / rt_v2.stib_trip_open with `tgeompoint`
+Mirrors source/src/etl/pipeline/load/load_stib.py at the schema level
+(produces rt.stib_trip / rt.stib_trip_open with `tgeompoint`
 trajectories), but operates offline on a fully-loaded position table.
 
 Bench dumps record every observation but lack a vehicle id — without one
@@ -19,8 +19,8 @@ with the same greedy spatial+temporal assignment used in real time:
             close any trip idle for > TRIP_TIMEOUT_S
 
 Run with:
-    python -m src.etl.pipeline.load.load_stib_v2          # all lines
-    python -m src.etl.pipeline.load.load_stib_v2 53 56    # specific lineids
+    python -m src.etl.pipeline.load.load_stib          # all lines
+    python -m src.etl.pipeline.load.load_stib 53 56    # specific lineids
 """
 from __future__ import annotations
 
@@ -43,14 +43,14 @@ if _REPO_ROOT not in sys.path:
 
 from src.env_manager import DATABASE_URL  # noqa: E402
 
-# Same constants as upstream load_stib_v2.py — keep matching decisions
+# Same constants as upstream load_stib.py — keep matching decisions
 # comparable.
 MATCH_RADIUS_M = 500.0
 MATCH_WINDOW_S = 300.0      # 5 min
 TRIP_TIMEOUT_S = 1800       # 30 min
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("load_stib_v2")
+log = logging.getLogger("load_stib")
 
 
 def _haversine_m(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
@@ -105,7 +105,7 @@ class _OpenTrip:
         self.end_ts = ts
 
 
-def _flush_trips(conn, trips: list[_OpenTrip], target: str = "rt_v2.stib_trip") -> int:
+def _flush_trips(conn, trips: list[_OpenTrip], target: str = "rt.stib_trip") -> int:
     if not trips:
         return 0
     inserted = 0
@@ -171,7 +171,7 @@ def _build_for_pair(
     closed.extend(open_trips)
     keep = [t for t in closed if len(t.samples) >= 2]
     n_dropped = len(closed) - len(keep)
-    n_inserted = _flush_trips(conn, keep, target="rt_v2.stib_trip")
+    n_inserted = _flush_trips(conn, keep, target="rt.stib_trip")
     return n_inserted, n_dropped
 
 
@@ -186,7 +186,7 @@ def _list_pairs(conn, line_filter: list[str] | None) -> list[tuple[str, int]]:
         cur.execute(
             f"""
             SELECT lineid, direction, COUNT(*) AS n
-              FROM rt_v2.stib_vehicle_position
+              FROM rt.stib_vehicle_position
              WHERE {where_sql}
              GROUP BY lineid, direction
              ORDER BY lineid, direction;
@@ -202,7 +202,7 @@ def _stream_positions(conn, lineid: str, direction: int) -> Iterator[tuple[datet
         cur.execute(
             """
             SELECT fetched_at, ST_X(geom), ST_Y(geom)
-              FROM rt_v2.stib_vehicle_position
+              FROM rt.stib_vehicle_position
              WHERE lineid = %s AND direction = %s AND geom IS NOT NULL
              ORDER BY fetched_at ASC;
             """,
@@ -219,9 +219,9 @@ def main() -> int:
     conn = psycopg2.connect(DATABASE_URL)
     try:
         with conn.cursor() as cur:
-            cur.execute("TRUNCATE rt_v2.stib_trip, rt_v2.stib_trip_open;")
+            cur.execute("TRUNCATE rt.stib_trip, rt.stib_trip_open;")
             conn.commit()
-        log.info("truncated rt_v2.stib_trip and rt_v2.stib_trip_open")
+        log.info("truncated rt.stib_trip and rt.stib_trip_open")
 
         pairs = _list_pairs(conn, line_filter)
         log.info("processing %d (lineid, direction) pairs", len(pairs))

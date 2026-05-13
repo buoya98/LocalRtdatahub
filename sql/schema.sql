@@ -1,16 +1,14 @@
 -- LocalRtdatahub — Transport schema (PostGIS + MobilityDB)
 --
--- Extracted from upstream RTDataHub
---   source/src/etl/pipeline/load/create_tables_v2.py  (rt_v2.stib_*)
---   source/src/etl/pipeline/load/create_tables.py     (static.stib_*)
---
--- Scope: Transport-only standalone — bench data + STIB GTFS static data.
+-- Mirrors the upstream RTDataHub layout (rt.stib_*, static.stib_*) so
+-- service queries port over verbatim. Scope: Transport-only standalone
+-- (bench dumps + STIB GTFS static data).
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS mobilitydb CASCADE;
 
 CREATE SCHEMA IF NOT EXISTS static;
-CREATE SCHEMA IF NOT EXISTS rt_v2;
+CREATE SCHEMA IF NOT EXISTS rt;
 CREATE SCHEMA IF NOT EXISTS transport_local;
 
 
@@ -67,10 +65,10 @@ CREATE INDEX IF NOT EXISTS idx_stib_line_shape_lid  ON static.stib_line_shape(li
 
 
 -- ============================================================
--- RT v2 schema — bench/shadow schema (target of ingest_bench.py)
+-- `rt` schema — vehicle positions (target of the bench / live ingestors)
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS rt_v2.stib_vehicle_position (
+CREATE TABLE IF NOT EXISTS rt.stib_vehicle_position (
     position_id          TEXT PRIMARY KEY,
     vehicle_uuid         TEXT,
     lineid               TEXT,
@@ -81,18 +79,18 @@ CREATE TABLE IF NOT EXISTS rt_v2.stib_vehicle_position (
     geom                 GEOMETRY(Point, 4326),
     ingested_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_v2_stib_pos_lineid  ON rt_v2.stib_vehicle_position(lineid);
-CREATE INDEX IF NOT EXISTS idx_v2_stib_pos_fetched ON rt_v2.stib_vehicle_position(fetched_at);
-CREATE INDEX IF NOT EXISTS idx_v2_stib_pos_geom    ON rt_v2.stib_vehicle_position USING GIST(geom);
+CREATE INDEX IF NOT EXISTS idx_stib_pos_lineid  ON rt.stib_vehicle_position(lineid);
+CREATE INDEX IF NOT EXISTS idx_stib_pos_fetched ON rt.stib_vehicle_position(fetched_at);
+CREATE INDEX IF NOT EXISTS idx_stib_pos_geom    ON rt.stib_vehicle_position USING GIST(geom);
 
 
 -- ============================================================
 -- TRIP tables — populated by scripts/build_trips.py via greedy
--- spatial+temporal assignment of rt_v2.stib_vehicle_position.
--- Schema is the upstream rt_v2 (MobilityDB tgeompoint).
+-- spatial+temporal assignment of rt.stib_vehicle_position.
+-- Schema follows the upstream `rt` layout (MobilityDB tgeompoint).
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS rt_v2.stib_trip_open (
+CREATE TABLE IF NOT EXISTS rt.stib_trip_open (
     trip_id              TEXT PRIMARY KEY,
     vehicle_uuid         TEXT,
     lineid               TEXT NOT NULL,
@@ -107,14 +105,14 @@ CREATE TABLE IF NOT EXISTS rt_v2.stib_trip_open (
     last_pos_m_on_shape  DOUBLE PRECISION,
     ingested_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_open_lineid ON rt_v2.stib_trip_open(lineid, direction, end_ts);
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_open_end    ON rt_v2.stib_trip_open(end_ts);
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_open_lastpt ON rt_v2.stib_trip_open USING GIST(last_point);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_open_lineid ON rt.stib_trip_open(lineid, direction, end_ts);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_open_end    ON rt.stib_trip_open(end_ts);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_open_lastpt ON rt.stib_trip_open USING GIST(last_point);
 -- Mirror the GIST on the trip column so the `t.trip::tstzspan && span(…)`
 -- post-filter is index-eligible on both branches of stib_trip_all.
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_open_gist   ON rt_v2.stib_trip_open USING GIST(trip);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_open_gist   ON rt.stib_trip_open USING GIST(trip);
 
-CREATE TABLE IF NOT EXISTS rt_v2.stib_trip (
+CREATE TABLE IF NOT EXISTS rt.stib_trip (
     trip_id         TEXT PRIMARY KEY,
     vehicle_uuid    TEXT,
     lineid          TEXT NOT NULL,
@@ -127,28 +125,28 @@ CREATE TABLE IF NOT EXISTS rt_v2.stib_trip (
     trip            tgeompoint,
     ingested_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_lineid ON rt_v2.stib_trip(lineid);
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_start  ON rt_v2.stib_trip(start_ts);
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_end    ON rt_v2.stib_trip(end_ts);
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_gist   ON rt_v2.stib_trip USING GIST(trip);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_lineid ON rt.stib_trip(lineid);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_start  ON rt.stib_trip(start_ts);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_end    ON rt.stib_trip(end_ts);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_gist   ON rt.stib_trip USING GIST(trip);
 -- Composite index used by /api/stib/{live-positions,trajectories} after the
 -- c43aaa2 query refactor: predicate `start_ts <= … AND end_ts >= …` becomes
 -- index-eligible, eliminating a planner BitmapAnd over the two single-col
 -- indexes. Upstream-measured impact: 3.4s → 22ms (live-positions, no filter).
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_lineid_start
-    ON rt_v2.stib_trip(lineid, start_ts DESC);
-CREATE INDEX IF NOT EXISTS idx_v2_stib_trip_open_lineid_start
-    ON rt_v2.stib_trip_open(lineid, start_ts DESC);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_lineid_start
+    ON rt.stib_trip(lineid, start_ts DESC);
+CREATE INDEX IF NOT EXISTS idx_stib_trip_open_lineid_start
+    ON rt.stib_trip_open(lineid, start_ts DESC);
 
-DROP VIEW IF EXISTS rt_v2.stib_trip_all;
-CREATE VIEW rt_v2.stib_trip_all AS
+DROP VIEW IF EXISTS rt.stib_trip_all;
+CREATE VIEW rt.stib_trip_all AS
 SELECT trip_id, vehicle_uuid, lineid, direction, start_ts, end_ts,
        point_count, line_trip_id, NULL::INTEGER AS daily_trip_seq, trip, ingested_at
-  FROM rt_v2.stib_trip_open
+  FROM rt.stib_trip_open
 UNION ALL
 SELECT trip_id, vehicle_uuid, lineid, direction, start_ts, end_ts,
        point_count, line_trip_id, daily_trip_seq, trip, ingested_at
-  FROM rt_v2.stib_trip;
+  FROM rt.stib_trip;
 
 
 -- ============================================================

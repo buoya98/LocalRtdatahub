@@ -18,8 +18,8 @@ def fetch_health(ctx: MapAppContext) -> dict[str, Any]:
                 SELECT
                     (SELECT COUNT(*) FROM pg_extension WHERE extname='postgis')    AS postgis,
                     (SELECT COUNT(*) FROM pg_extension WHERE extname='mobilitydb') AS mobilitydb,
-                    (SELECT COUNT(*) FROM rt_v2.stib_vehicle_position)             AS positions,
-                    (SELECT COUNT(*) FROM rt_v2.stib_trip)                         AS trips;
+                    (SELECT COUNT(*) FROM rt.stib_vehicle_position)             AS positions,
+                    (SELECT COUNT(*) FROM rt.stib_trip)                         AS trips;
                 """
             )
             row = cur.fetchone()
@@ -38,8 +38,8 @@ def fetch_counts(ctx: MapAppContext) -> dict[str, int]:
             cur.execute(
                 """
                 SELECT
-                    (SELECT COUNT(*) FROM rt_v2.stib_vehicle_position)        AS positions,
-                    (SELECT COUNT(*) FROM rt_v2.stib_trip)                    AS trips,
+                    (SELECT COUNT(*) FROM rt.stib_vehicle_position)        AS positions,
+                    (SELECT COUNT(*) FROM rt.stib_trip)                    AS trips,
                     (SELECT COUNT(*) FROM static.stib_stop)                   AS stops,
                     (SELECT COUNT(*) FROM static.stib_line_shape)             AS line_shapes,
                     (SELECT COUNT(*) FROM transport_local.stib_waiting_time)  AS waiting_times;

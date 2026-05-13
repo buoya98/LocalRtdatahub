@@ -18,7 +18,7 @@ LocalRtdatahub/
 │   ├── env_manager.py              # .env reader (dotted or underscore keys)
 │   ├── etl/
 │   │   ├── ingestion/
-│   │   │   ├── bench/              # raw .jsonl.gz / .csv.gz → rt_v2.*
+│   │   │   ├── bench/              # raw .jsonl.gz / .csv.gz → rt.*
 │   │   │   │   └── ingestor.py
 │   │   │   └── stib/               # STIB ODP: GTFS static + live positions
 │   │   │       ├── ingestor.py     # CLI dispatcher
@@ -30,7 +30,7 @@ LocalRtdatahub/
 │   │       ├── transform/
 │   │       │   └── stib_transform.py   # geom from line_shape + stop in SQL
 │   │       └── load/
-│   │           └── load_stib_v2.py     # rt_v2.stib_vehicle_position → trips
+│   │           └── load_stib.py     # rt.stib_vehicle_position → trips
 │   └── map/
 │       ├── server/                 # Flask app split by domain
 │       │   ├── main.py             # entry point (Werkzeug)
@@ -44,7 +44,7 @@ LocalRtdatahub/
 ├── data/                           # raw bench dumps (.jsonl.gz / .csv.gz)
 │   └── bench_algo_data/
 ├── sql/
-│   └── schema.sql                  # PostGIS + MobilityDB + rt_v2.stib_*
+│   └── schema.sql                  # PostGIS + MobilityDB + rt.stib_*
 ├── requirements.txt
 └── .env.example
 ```
@@ -152,7 +152,7 @@ Verify:
 
 ```bash
 psql "postgresql://rtdatahub:rtdatahub@localhost:5432/rtdatahub_local" \
-  -c "\dt rt_v2.*"
+  -c "\dt rt.*"
 ```
 
 You should see `stib_vehicle_position` and `stib_trip` (created by
@@ -183,7 +183,7 @@ cp .env.example .env
 ## 5. Data ingestion
 
 Two input paths share the same transform and write **identical rows** to
-`rt_v2.stib_vehicle_position`. Records are deduplicated by a deterministic
+`rt.stib_vehicle_position`. Records are deduplicated by a deterministic
 `position_id` (SHA-256 of `lineid|direction|pointid|fetched_at|distance`),
 so re-running on overlapping data is idempotent.
 
@@ -276,8 +276,8 @@ File-type auto-detection:
 
 | File                                        | Target                                                                  |
 | ------------------------------------------- | ----------------------------------------------------------------------- |
-| `assignments.csv.gz`                        | `rt_v2.stib_vehicle_position` (lat/lon already present)                 |
-| `positions/*.jsonl.gz`                      | `rt_v2.stib_vehicle_position` (geom computed like the live API path)    |
+| `assignments.csv.gz`                        | `rt.stib_vehicle_position` (lat/lon already present)                 |
+| `positions/*.jsonl.gz`                      | `rt.stib_vehicle_position` (geom computed like the live API path)    |
 | `wt.jsonl.gz` or `waiting_times/*.jsonl.gz` | `transport_local.stib_waiting_time`                                     |
 
 > ⚠️ **No-overwrite guarantee.** Raw `.jsonl.gz` files are never touched.
@@ -289,24 +289,24 @@ File-type auto-detection:
 ### 5.c — Trip reconstruction (MobilityDB `tgeompoint`)
 
 **Prerequisite:** §5.a or §5.b must have populated
-`rt_v2.stib_vehicle_position`. Without rows there, this step produces
+`rt.stib_vehicle_position`. Without rows there, this step produces
 zero trips silently.
 
 Whereas §5.a/§5.b insert individual vehicle observations,
-`load_stib_v2` groups them into trip-shaped `tgeompoint`
+`load_stib` groups them into trip-shaped `tgeompoint`
 trajectories. The STIB feed has no vehicle identifier, so trip identity
 is rebuilt offline by greedy spatial+temporal assignment (see
 [docs/ARCHITECTURE.md §5](docs/ARCHITECTURE.md) for the algorithm).
 
 ```bash
-python -m src.etl.pipeline.load.load_stib_v2          # all lines
-python -m src.etl.pipeline.load.load_stib_v2 53 56    # specific lines
+python -m src.etl.pipeline.load.load_stib          # all lines
+python -m src.etl.pipeline.load.load_stib 53 56    # specific lines
 ```
 
-> ⚠️ This step **truncates** `rt_v2.stib_trip` and
-> `rt_v2.stib_trip_open` before rebuilding — it's destructive by
+> ⚠️ This step **truncates** `rt.stib_trip` and
+> `rt.stib_trip_open` before rebuilding — it's destructive by
 > design (re-runs are reproducible). Closed trips land in
-> `rt_v2.stib_trip`; the `rt_v2.stib_trip_all` view (used by the API)
+> `rt.stib_trip`; the `rt.stib_trip_all` view (used by the API)
 > unions both tables.
 
 Sanity check:
@@ -314,7 +314,7 @@ Sanity check:
 ```bash
 psql "postgresql://rtdatahub:rtdatahub@localhost:5432/rtdatahub_local" -c "
   SELECT lineid, COUNT(*)
-    FROM rt_v2.stib_vehicle_position
+    FROM rt.stib_vehicle_position
    GROUP BY lineid ORDER BY lineid LIMIT 10;
 "
 ```
@@ -381,14 +381,44 @@ Loading new `.jsonl.gz` every day? Start from a clean DB:
 
 ```bash
 psql "postgresql://rtdatahub:rtdatahub@localhost:5432/rtdatahub_local" -c "
-  TRUNCATE rt_v2.stib_vehicle_position,
-           rt_v2.stib_trip,
-           rt_v2.stib_trip_open,
+  TRUNCATE rt.stib_vehicle_position,
+           rt.stib_trip,
+           rt.stib_trip_open,
            transport_local.stib_waiting_time;
 "
 ```
 
 Then re-run the relevant ingestor.
+
+### Migrating from a pre-rename `rt_v2.*` DB
+
+Earlier versions of this project used a `rt_v2` schema (matching the
+upstream's now-retired v2 shadow). The schema has been renamed to
+`rt` to match upstream's current naming. If you have an existing DB
+populated under `rt_v2.*`, rename it in-place — no data loss:
+
+```bash
+psql "postgresql://rtdatahub:rtdatahub@localhost:5432/rtdatahub_local" <<'EOF'
+ALTER SCHEMA rt_v2 RENAME TO rt;
+-- Old index names keep their old labels; drop them so a fresh
+-- schema.sql re-run can recreate them with the new names cleanly.
+DROP INDEX IF EXISTS rt.idx_v2_stib_pos_lineid;
+DROP INDEX IF EXISTS rt.idx_v2_stib_pos_fetched;
+DROP INDEX IF EXISTS rt.idx_v2_stib_pos_geom;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_lineid;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_end;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_lastpt;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_gist;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_lineid_start;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_lineid;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_start;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_end;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_gist;
+DROP INDEX IF EXISTS rt.idx_v2_stib_trip_lineid_start;
+EOF
+
+psql ... -f sql/schema.sql   # re-creates the new-named indexes + view
+```
 
 ---
 
@@ -398,7 +428,7 @@ Then re-run the relevant ingestor.
 | -------------------------------------------------- | --------------------------------------------------------------------------- |
 | `extension "mobilitydb" is not available`          | Build didn't install the extension into `/usr/lib/postgresql/18/`. Recompile forcing `PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config`. |
 | `psql: error: connection refused`                  | `sudo systemctl start postgresql`; check `pg_isready`.                      |
-| `permission denied for schema rt_v2`               | Re-run `sql/schema.sql` as the `rtdatahub` user after creating it.          |
+| `permission denied for schema rt`                  | Re-run `sql/schema.sql` as the `rtdatahub` user after creating it.          |
 | Empty map                                          | `/api/health` should report `mobilitydb: true`. If yes, check `/api/stib/lines` (empty DB → re-run an ingestor).                          |
 | Conda shadows the system `psql`                    | `conda deactivate` or use the absolute path `/usr/lib/postgresql/18/bin/psql`. |
 | `STIB_ODP_KEY environment variable is not set`     | Add `STIB_ODP_KEY=…` to `.env` (request a key on the STIB Open Data Portal). |
@@ -409,7 +439,7 @@ Then re-run the relevant ingestor.
 
 **Kept** (mirrors the upstream — same paths under `src/`):
 
-- Tables `rt_v2.stib_vehicle_position`, `rt_v2.stib_trip*`, `static.stib_*`
+- Tables `rt.stib_vehicle_position`, `rt.stib_trip*`, `static.stib_*`
   ([sql/schema.sql](sql/schema.sql))
 - Full map-server API: `/api/stib/lines`, `/live-positions`,
   `/trajectories`, `/shape/...`, `/stop/...`, `/api/search`,
@@ -417,7 +447,7 @@ Then re-run the relevant ingestor.
 - STIB ODP ingestion: stops + lines + shapes + RT positions
   ([src/etl/ingestion/stib/](src/etl/ingestion/stib/))
 - MobilityDB trip reconstruction
-  ([src/etl/pipeline/load/load_stib_v2.py](src/etl/pipeline/load/load_stib_v2.py))
+  ([src/etl/pipeline/load/load_stib.py](src/etl/pipeline/load/load_stib.py))
 
 **Removed** (out of scope or dependent on credentialed external APIs):
 

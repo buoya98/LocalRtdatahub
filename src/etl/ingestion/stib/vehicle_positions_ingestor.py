@@ -2,7 +2,7 @@
 
 Mirrors source/src/etl/ingestion/stib/ingestor.py: pulls
 `/rt/VehiclePositions` from the STIB Azure APIM gateway and feeds the
-records into rt_v2.stib_vehicle_position via stib_transform.
+records into rt.stib_vehicle_position via stib_transform.
 
 The ODP response carries no GPS coords — geom is reconstructed in SQL
 from static.stib_line_shape + static.stib_stop (see
@@ -214,7 +214,7 @@ def _append_jsonl_gz(path: Path, records: Iterator[dict[str, Any]]) -> int:
 
 def run(*, url: str, key: str, interval: float | None,
         output: Path | None, batch_size: int = INGEST_BATCH_SIZE) -> int:
-    """Poll the ODP and insert into rt_v2.stib_vehicle_position. If
+    """Poll the ODP and insert into rt.stib_vehicle_position. If
     `interval` is None or 0, polls once and returns. Returns inserted count
     (sum across iterations)."""
     if not key:
