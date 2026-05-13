@@ -100,7 +100,7 @@ The whole stack is:
                                             │  JSON / MVT
                           ┌─────────────────▼─────────────────────┐
                           │ src/map/templates/index.html          │
-                          │ (MapLibre SPA, ~5k lines reused)      │
+                          │ (MapLibre SPA, ~3.7k lines, STIB-only) │
                           └───────────────────────────────────────┘
 ```
 
@@ -762,11 +762,11 @@ only consumer.
 | `GET /api/waiting-times?pointid=…`                 | [waiting_times.py:13](../src/map/server/services/waiting_times.py)                  | stop popup                                                            |
 | `GET /tiles/<layer>/<z>/<x>/<y>.pbf`               | [tiles.py:43](../src/map/server/services/tiles.py)                                  | [index.html:1519, 3207, 4393](../src/map/templates/index.html)        |
 
-Any other endpoint the upstream frontend asks for (e.g.
-`/api/delijn/*`, `/api/traffic-lights`, `/api/fid/...`,
-`/api/xtream-camera/...`) now returns a Flask 404. The frontend's
-`fetch().catch()` handlers degrade silently; the corresponding UI
-panels render empty.
+Endpoints from non-STIB domains that existed in the upstream
+(`/api/delijn/*`, `/api/traffic-lights`, `/api/fid/...`,
+`/api/xtream-camera/...`) have been removed; the frontend has been
+trimmed in parallel to drop all matching panels, layers and fetches,
+so a STIB-only stack runs end-to-end without stub traffic.
 
 Two contract details worth noting:
 
@@ -883,10 +883,8 @@ Two reasons:
 The cost is some empty-ish artefacts (e.g. `rt.stib_trip_open` exists
 but stays empty locally because we don't run a real-time trip
 stitcher). Out-of-scope domains (De Lijn, TomTom, Waze, ANPR,
-traffic-light, FLIR) used to ship as empty backend stubs but were
-removed in a later pass — the upstream `index.html` still references
-them, but its `fetch().catch()` paths swallow the 404s and the
-affected UI panels render empty.
+traffic-light, FLIR) were removed from both the backend and the
+frontend — the map is STIB-only, no stub traffic anywhere.
 
 ### Q. Why no Docker?
 

@@ -695,17 +695,6 @@
     .stib-mode-badge.tram  { background: #dc2626; }
     .stib-mode-badge.bus   { background: #dc2626; }
 
-    /* ── De Lijn stop hover tooltip ── */
-    #delijnStopHoverTooltip {
-      position: absolute; z-index: 10; pointer-events: none;
-      background: rgba(255,255,255,0.97); color: #111827;
-      font: 12px/1.4 system-ui, -apple-system, sans-serif;
-      padding: 8px 10px; border-radius: 8px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-      border: 1px solid rgba(0,0,0,0.08);
-      max-width: 320px; display: none;
-    }
-
     /* ── Opacity controls — left panel (icon toggle → inline slider) ── */
     .layer-row-wrap {
       position: relative;
@@ -829,22 +818,6 @@
       0%, 100% { opacity: 0.85; }
       50%      { opacity: 0.5; }
     }
-    /* ── De Lijn Alerts ────────────────────────────────────────── */
-    #delijnAlertTooltip {
-      position: absolute; z-index: 1200; pointer-events: none;
-      background: rgba(15,23,42,0.92); backdrop-filter: blur(8px);
-      border: 1px solid rgba(239,68,68,0.5); border-radius: 8px;
-      padding: 8px 12px; font-size: 12px; color: #f1f5f9;
-      max-width: 280px; display: none; line-height: 1.45;
-    }
-    #delijnAlertTooltip .alert-sev {
-      font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-    }
-    #delijnAlertTooltip .alert-sev.high   { color: #dc2626; }
-    #delijnAlertTooltip .alert-sev.medium { color: #f97316; }
-    #delijnAlertTooltip .alert-sev.low    { color: #eab308; }
-    #delijnAlertTooltip .alert-detail { color: #94a3b8; margin-top: 4px; }
-
     /* ── Search box (top center) ── */
     #searchBox {
       position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
@@ -898,10 +871,7 @@
       font-size: 11px; font-weight: 700;
     }
     .sr-badge.stib    { background: #1a3a8f; color: #93c5fd; }
-    .sr-badge.delijn  { background: #78350f; color: #fde68a; }
     .sr-badge.line    { background: #1e3a5f; color: #7dd3fc; }
-    .sr-badge.camera  { background: #1e293b; color: #94a3b8; }
-    .sr-badge.tl      { background: #3b1f00; color: #fb923c; }
     .sr-label { flex: 1; font-size: 13px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sr-sub   { flex-shrink: 0; font-size: 11px; color: #475569; margin-left: 6px; }
     #searchEmpty { padding: 14px; text-align: center; font-size: 13px; color: #475569; }
@@ -921,8 +891,6 @@
   </div>
   <div id="stibStopHoverTooltip"></div>
   <div id="stibAlertTooltip"></div>
-  <div id="delijnAlertTooltip"></div>
-  <div id="delijnStopHoverTooltip"></div>
   <div id="chartExpandBackdrop"></div>
   <div id="panel">
     <div id="panelHeader">
@@ -994,10 +962,6 @@
             <div class="tp-op-name">STIB</div>
             <div class="tp-op-sub">Brussels</div>
           </div>
-          <div class="tp-op-card" data-operator="delijn">
-            <div class="tp-op-name">De Lijn</div>
-            <div class="tp-op-sub">Flanders</div>
-          </div>
           <div class="tp-op-card disabled">
             <div class="tp-op-name">SNCB</div>
             <div class="tp-op-sub">Soon</div>
@@ -1006,21 +970,6 @@
             <div class="tp-op-name">TEC</div>
             <div class="tp-op-sub">Soon</div>
           </div>
-        </div>
-        <div class="tp-section-title" style="margin-top:14px">Segment alerts</div>
-        <div class="tp-toggles tp-toggles-grid">
-          <div class="tp-toggle-wrap">
-            <button class="tp-toggle" id="segAlertProx"  type="button"><span class="tp-toggle-ico" style="color:#ef4444">●</span>Proximity</button>
-          </div>
-          <div class="tp-toggle-wrap">
-            <button class="tp-toggle" id="segAlertSlow"  type="button"><span class="tp-toggle-ico" style="color:#fb923c">●</span>Slow speed</button>
-          </div>
-          <div class="tp-toggle-wrap">
-            <button class="tp-toggle" id="segAlertStuck" type="button"><span class="tp-toggle-ico" style="color:#9333ea">●</span>Stuck</button>
-          </div>
-        </div>
-        <div class="tp-legend" style="margin-top:6px; color:#64748b">
-          Segment color: <span style="color:#06b6d4">cyan</span> &rarr; <span style="color:#ef4444">red</span> by alert density (STIB + De Lijn)
         </div>
       </div>
       <div id="tpLevelStib" style="display:none">
@@ -1074,53 +1023,6 @@
           <button id="tpSelectNone" type="button">None</button>
         </div>
         <div class="tp-legend" id="tpLegend"></div>
-      </div>
-      <div id="tpLevelDelijn" style="display:none">
-        <div class="tp-stib-header">
-          <button class="tp-back-btn" id="tpBackBtnDelijn" type="button">← Back</button>
-          <b>De Lijn</b>
-        </div>
-        <div class="tp-toggles tp-toggles-grid">
-          <div class="tp-toggle-wrap">
-            <button class="tp-toggle" id="tpDlToggleSegments" type="button"><span class="tp-toggle-ico">━</span>Segments</button>
-            <div class="tp-toggle-slider" id="tpDlSliderSegments"><input type="range" min="0" max="100" value="100" /><span class="opacity-val">100%</span></div>
-          </div>
-          <div class="tp-toggle-wrap">
-            <button class="tp-toggle" id="tpDlToggleStops" type="button"><span class="tp-toggle-ico">●</span>Stops</button>
-            <div class="tp-toggle-slider" id="tpDlSliderStops"><input type="range" min="0" max="100" value="100" /><span class="opacity-val">100%</span></div>
-          </div>
-          <div class="tp-toggle-wrap">
-            <button class="tp-toggle" id="tpDlToggleVehicles" type="button"><span class="tp-toggle-ico">🚌</span>Vehicles <span id="tpDlVehicleCount" style="opacity:.7;font-weight:500"></span></button>
-            <div class="tp-toggle-slider" id="tpDlSliderVehicles"><input type="range" min="0" max="100" value="100" /><span class="opacity-val">100%</span></div>
-          </div>
-          <div class="tp-toggle-wrap">
-            <button class="tp-toggle tp-toggle-alert" id="tpDlToggleAlerts" type="button"><span class="tp-toggle-ico">⚠</span>Alerts</button>
-            <div class="tp-toggle-slider" id="tpDlSliderAlerts"><input type="range" min="0" max="100" value="100" /><span class="opacity-val">100%</span></div>
-          </div>
-        </div>
-        <div id="tpDlTemporal" style="display:none">
-          <div class="tp-tc-row">
-            <button class="tp-tc-btn" id="tpDlPlayBtn" type="button" title="Play / Pause">▶</button>
-            <input type="range" id="tpDlSlider" min="0" max="1000" value="0" step="1" />
-            <span id="tpDlTimestamp">—</span>
-          </div>
-          <div class="tp-tc-row tp-speed-row">
-            Speed:
-            <button class="tp-speed-btn dl-speed-btn active" data-speed="1"   type="button">×1</button>
-            <button class="tp-speed-btn dl-speed-btn"        data-speed="2"   type="button">×2</button>
-            <button class="tp-speed-btn dl-speed-btn"        data-speed="5"   type="button">×5</button>
-            <button class="tp-speed-btn dl-speed-btn"        data-speed="10"  type="button">×10</button>
-            <button class="tp-speed-btn dl-speed-btn"        data-speed="30"  type="button">×30</button>
-          </div>
-        </div>
-        <div id="tpDlLinesList">
-          <div class="tp-empty">Loading lines…</div>
-        </div>
-        <div class="tp-bulk">
-          <button id="tpDlSelectAll" type="button">All</button>
-          <button id="tpDlSelectNone" type="button">None</button>
-        </div>
-        <div class="tp-legend" id="tpDlLegend"></div>
       </div>
     </div>
   </div>
@@ -1199,51 +1101,6 @@
 
     // Tile layer definitions for lazy loading
     const TILE_LAYER_DEFS = {
-      transport_segments: {
-        source: { type: "vector", tiles: [], minzoom: 8, maxzoom: 13 },
-        layers: [
-          // Three independent line layers on the same vector source.
-          // Each is toggled on/off by a button in the bottom-left "Segment
-          // alerts" box and paints every geolink fid cyan→red based on ONE
-          // metric (TomTom flow style, shared between STIB + De Lijn).
-          {
-            id: "segment-alert-proximity", type: "line", "source-layer": "transport_segments",
-            layout: { visibility: "none" },
-            paint: {
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 2.2, 13, 6.2],
-              "line-opacity": 0.95,
-              "line-color": [
-                "interpolate", ["linear"], ["coalesce", ["get", "proximity_count"], 0],
-                0, "#06b6d4", 5, "#84cc16", 15, "#facc15", 40, "#fb923c", 100, "#ef4444"
-              ]
-            }
-          },
-          {
-            id: "segment-alert-slow-speed", type: "line", "source-layer": "transport_segments",
-            layout: { visibility: "none" },
-            paint: {
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 2.2, 13, 6.2],
-              "line-opacity": 0.95,
-              "line-color": [
-                "interpolate", ["linear"], ["coalesce", ["get", "slow_speed_count"], 0],
-                0, "#06b6d4", 5, "#84cc16", 15, "#facc15", 40, "#fb923c", 100, "#ef4444"
-              ]
-            }
-          },
-          {
-            id: "segment-alert-stuck", type: "line", "source-layer": "transport_segments",
-            layout: { visibility: "none" },
-            paint: {
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 2.2, 13, 6.2],
-              "line-opacity": 0.95,
-              "line-color": [
-                "interpolate", ["linear"], ["coalesce", ["get", "stuck_count"], 0],
-                0, "#06b6d4", 1, "#84cc16", 3, "#facc15", 8, "#fb923c", 20, "#ef4444"
-              ]
-            }
-          }
-        ]
-      },
       tomtom_flow: {
         source: { type: "vector", tiles: [], minzoom: 8, maxzoom: 13 },
         layers: [
@@ -1389,53 +1246,6 @@
           }
         ]
       },
-      delijn_lines: {
-        // De Lijn transit line shapes from delijn_line_shape.
-        // Colour-coded by route_color from GTFS (default: De Lijn blue #0078C8).
-        source: { type: "vector", tiles: [], minzoom: 8, maxzoom: 13 },
-        layers: [
-          {
-            id: "delijn-lines-casing", type: "line", "source-layer": "delijn_lines",
-            layout: { visibility: "visible", "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 3.0, 14, 6.5],
-              "line-opacity": 0.55, "line-color": "#0b0b0e"
-            }
-          },
-          {
-            id: "delijn-lines-line", type: "line", "source-layer": "delijn_lines",
-            layout: { visibility: "visible", "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1.8, 14, 4.2],
-              "line-opacity": 0.95,
-              "line-color": [
-                "case",
-                ["all", ["has", "route_color"], ["!=", ["get", "route_color"], null]],
-                ["get", "route_color"],
-                "#0078C8"
-              ]
-            }
-          }
-        ]
-      },
-      delijn_stops: {
-        // De Lijn stops from delijn_stop. Small dots, visible at higher zooms.
-        source: { type: "vector", tiles: [], minzoom: 12, maxzoom: 16 },
-        layers: [
-          {
-            id: "delijn-stops-circle", type: "circle", "source-layer": "delijn_stops",
-            minzoom: 13,
-            layout: { visibility: "visible" },
-            paint: {
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 2.5, 16, 5.5],
-              "circle-color": "#FED700",
-              "circle-stroke-color": "#111827",
-              "circle-stroke-width": 1.2,
-              "circle-opacity": 0.95
-            }
-          }
-        ]
-      }
     };
     const addedTileSources = new Set();
 
@@ -2001,30 +1811,8 @@
     }
 
     function bringInteractiveLayersToFront() {
-      const ordered = [
-        "geolink-segments-casing",
-        "geolink-segments-line",
-        "segment-alert-proximity",
-        "segment-alert-slow-speed",
-        "segment-alert-stuck",
-        "selected-segment-line",
-        "traffic-lights-circle",
-        "fid-traffic-lights-circle",
-        "selected-traffic-light-circle",
-        "fid-anpr-line",
-        "fid-anpr-point",
-        "fid-brussels-line",
-        "fid-brussels-point",
-        "fid-waze-jam-line",
-        "fid-waze-jam-point",
-        "fid-waze-alert-line",
-        "fid-waze-alert-point",
-        "fid-tomtom-flow-line",
-        "fid-tomtom-flow-point",
-        "fid-tomtom-incident-line",
-        "fid-tomtom-incident-point",
-        "fid-transport-point"
-      ];
+      // STIB-only build: no extra layers need re-ordering at the front.
+      const ordered = [];
       ordered.forEach((layerId) => {
         if (map.getLayer(layerId)) {
           map.moveLayer(layerId);
@@ -2302,154 +2090,25 @@
       if (metric === "transport") chart.resize();
     }
 
-    async function refreshFidCharts(fid) {
-      const statusEl = document.getElementById("status");
-      try {
-        const query = `${currentTimeQuery()}&bin_minutes=${BIN_MINUTES}${currentRefQuery()}`;
-        const resp = await fetch(`/api/fid/${fid}/stats?${query}`);
-        const data = await resp.json();
-        if (!data || data.ok !== true) {
-          throw new Error((data && data.error) || "stats unavailable");
-        }
-        const series = data.series || {};
-        const refSeries = data.ref_series || {};
-        const refLabel = data.ref_label || null;
-        Object.keys(METRIC_META).forEach((metric) => {
-          updateMetricChart(metric, series[metric] || [], refSeries[metric] || null, refLabel);
-        });
-      } catch (err) {
-        clearCharts();
-        statusEl.textContent = `Stats error for fid=${fid}: ${err.message || err}`;
-      }
-    }
-
-    async function refreshTrafficLightCapacity(signalgroupId, signalgroupNum) {
-      const statusEl = document.getElementById("status");
-      try {
-        const query = `${currentTimeQuery()}&bin_minutes=${BIN_MINUTES}${currentRefQuery()}`;
-        const resp = await fetch(`/api/traffic-light/${encodeURIComponent(signalgroupId)}/${signalgroupNum}/capacity?${query}`);
-        const data = await resp.json();
-        if (!data || data.ok !== true) {
-          throw new Error((data && data.error) || "traffic light capacity unavailable");
-        }
-        latestTrafficLightSeries = data;
-        updateTrafficLightCapacityChart(data);
-        expandTrafficLightPanel();
-        setTrafficLightPanelVisible(true);
-        const laneCount = Number(data.lane_count || 0);
-        const laneDirection = data.lane_direction == null ? "all" : String(data.lane_direction);
-        statusEl.textContent = `Traffic light ${signalgroupId}/${signalgroupNum} chart loaded (lanes=${laneCount}, direction=${laneDirection}).`;
-      } catch (err) {
-        latestTrafficLightSeries = null;
-        clearTrafficLightChart();
-        setTrafficLightPanelVisible(false);
-        statusEl.textContent = `Traffic light chart error for ${signalgroupId}/${signalgroupNum}: ${err.message || err}`;
-      }
-    }
-
-    async function refreshXtreamCapacity(tssId, movementName) {
-      const statusEl = document.getElementById("status");
-      try {
-        const query = `${currentTimeQuery()}&bin_minutes=${BIN_MINUTES}${currentRefQuery()}`;
-        const resp = await fetch(`/api/xtream-camera/${encodeURIComponent(tssId)}/${encodeURIComponent(movementName)}/capacity?${query}`);
-        const data = await resp.json();
-        if (!data || data.ok !== true) {
-          throw new Error((data && data.error) || "xtream capacity unavailable");
-        }
-        latestTrafficLightSeries = data;
-        updateTrafficLightCapacityChart(data);
-        expandTrafficLightPanel();
-        setTrafficLightPanelVisible(true);
-        statusEl.textContent = `Xtream ${tssId}/${movementName} chart loaded.`;
-      } catch (err) {
-        latestTrafficLightSeries = null;
-        clearTrafficLightChart();
-        setTrafficLightPanelVisible(false);
-        statusEl.textContent = `Xtream chart error for ${tssId}/${movementName}: ${err.message || err}`;
-      }
-    }
+    // STIB-only build: geolink/fid/traffic-light/xtream loaders neutralized.
+    async function refreshFidCharts(_fid) { /* removed */ }
+    async function refreshTrafficLightCapacity(_signalgroupId, _signalgroupNum) { /* removed */ }
+    async function refreshXtreamCapacity(_tssId, _movementName) { /* removed */ }
 
     function formatCycleSeconds(value) {
       const n = Number(value ?? 0);
       return Number.isFinite(n) ? n.toFixed(1) : "0.0";
     }
 
-    async function refreshTrafficLightLatestCycle(signalgroupId, signalgroupNum) {
-      const resp = await fetch(`/api/traffic-light/${encodeURIComponent(signalgroupId)}/${signalgroupNum}/latest-cycle`);
-      const data = await resp.json();
-      if (!data || data.ok !== true) {
-        throw new Error((data && data.error) || "traffic light latest cycle unavailable");
-      }
-      return data;
+    async function refreshTrafficLightLatestCycle(_signalgroupId, _signalgroupNum) {
+      throw new Error("traffic light endpoint removed in STIB-only build");
     }
 
-    async function refreshFidGeometries(fid) {
-      const statusEl = document.getElementById("status");
-      try {
-        const resp = await fetch(`/api/fid/${fid}/geometries?${currentTimeQuery()}`);
-        const data = await resp.json();
-        if (!data || data.ok !== true) {
-          throw new Error((data && data.error) || "geometries unavailable");
-        }
-        const sources = data.sources || {};
-        setSourceData("selected_segment", { type: "FeatureCollection", features: [data.segment] });
-        setSourceData("fid_anpr", sources.anpr || EMPTY_FC);
-        setSourceData("fid_brussels", sources.brussels || EMPTY_FC);
-        setSourceData("fid_waze_jam", sources.waze_jam || EMPTY_FC);
-        setSourceData("fid_waze_alert", sources.waze_alert || EMPTY_FC);
-        setSourceData("fid_tomtom_flow", sources.tomtom_flow || EMPTY_FC);
-        setSourceData("fid_tomtom_incident", sources.tomtom_incident || EMPTY_FC);
-        setSourceData("fid_transport", sources.transport || EMPTY_FC);
+    async function refreshFidGeometries(_fid) { /* removed */ }
 
-        const counts = data.counts || {};
-        statusEl.textContent = `fid=${fid} overlays loaded | anpr=${counts.anpr || 0}, brussels=${counts.brussels || 0}, waze_jam=${counts.waze_jam || 0}, waze_alert=${counts.waze_alert || 0}, tomtom_flow=${counts.tomtom_flow || 0}, tomtom_incident=${counts.tomtom_incident || 0}`;
-      } catch (err) {
-        statusEl.textContent = `Geometry error for fid=${fid}: ${err.message || err}`;
-      }
-    }
+    async function loadGeolinkSegments() { /* removed */ }
 
-    async function loadGeolinkSegments() {
-      const statusEl = document.getElementById("status");
-      try {
-        const resp = await fetch("/api/geolink-segments");
-        const data = await resp.json();
-        if (!data || data.ok !== true) {
-          throw new Error((data && data.error) || "segments unavailable");
-        }
-        const fc = data.segments || EMPTY_FC;
-        setSourceData("geolink_segments", fc);
-        statusEl.textContent = `Loaded ${fc.features ? fc.features.length : 0} geolink segments. Click one to inspect stats.`;
-      } catch (err) {
-        statusEl.textContent = `Segment loading error: ${err.message || err}`;
-      }
-    }
-
-    async function loadTrafficLights() {
-      const statusEl = document.getElementById("status");
-      try {
-        const resp = await fetch("/api/traffic-lights");
-        const data = await resp.json();
-        if (!data || data.ok !== true) {
-          throw new Error((data && data.error) || "traffic lights unavailable");
-        }
-        const fc = data.traffic_lights || EMPTY_FC;
-        allTrafficLights = fc;
-        setSourceData("traffic_lights", fc);
-        const features = Array.isArray(fc.features) ? fc.features : [];
-        const mappedCount = features.reduce((acc, f) => acc + ((f && f.properties && (f.properties.has_magnetometer || f.properties.has_xtream)) ? 1 : 0), 0);
-        const view = applyTrafficLightFidFilter();
-        trafficLightsLoaded = true;
-        statusEl.textContent = `Loaded ${features.length} traffic lights (${mappedCount} avec données, ${view.linkedToFid} linked to segments).`;
-        return true;
-      } catch (err) {
-        trafficLightsLoaded = false;
-        allTrafficLights = EMPTY_FC;
-        setSourceData("traffic_lights", EMPTY_FC);
-        setSourceData("fid_traffic_lights", EMPTY_FC);
-        statusEl.textContent = `Traffic lights loading error: ${err.message || err}`;
-        return false;
-      }
-    }
+    async function loadTrafficLights() { return false; }
 
     async function ensureTrafficLightsLoaded() {
       if (trafficLightsLoaded) return true;
@@ -2477,19 +2136,7 @@
             tiles: ["https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"],
             tileSize: 256,
             attribution: "&copy; <a href='https://carto.com/'>CARTO</a> &copy; <a href='https://www.openstreetmap.org/copyright'>OSM</a>"
-          },
-          geolink_segments: { type: "geojson", data: EMPTY_FC },
-          selected_segment: { type: "geojson", data: EMPTY_FC },
-          traffic_lights: { type: "geojson", data: EMPTY_FC },
-          fid_traffic_lights: { type: "geojson", data: EMPTY_FC },
-          selected_traffic_light: { type: "geojson", data: EMPTY_FC },
-          fid_anpr: { type: "geojson", data: EMPTY_FC },
-          fid_brussels: { type: "geojson", data: EMPTY_FC },
-          fid_waze_jam: { type: "geojson", data: EMPTY_FC },
-          fid_waze_alert: { type: "geojson", data: EMPTY_FC },
-          fid_tomtom_flow: { type: "geojson", data: EMPTY_FC },
-          fid_tomtom_incident: { type: "geojson", data: EMPTY_FC },
-          fid_transport: { type: "geojson", data: EMPTY_FC }
+          }
         },
         layers: [
           {
@@ -2500,182 +2147,6 @@
               "raster-saturation": -0.15,
               "raster-brightness-max": 0.95,
               "raster-contrast": 0.0
-            }
-          },
-          {
-            id: "geolink-segments-casing",
-            type: "line",
-            source: "geolink_segments",
-            paint: {
-              "line-color": "#ffffff",
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 4.5, 13, 8.0],
-              "line-opacity": 0.9
-            }
-          },
-          {
-            id: "geolink-segments-line",
-            type: "line",
-            source: "geolink_segments",
-            paint: {
-              "line-color": "#1e293b",
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 2.2, 13, 4.5],
-              "line-opacity": 0.9
-            }
-          },
-          {
-            id: "selected-segment-line",
-            type: "line",
-            source: "selected_segment",
-            paint: {
-              "line-color": "#fbbf24",
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 3.5, 13, 7.0],
-              "line-opacity": 0.95
-            }
-          },
-          {
-            id: "traffic-lights-circle",
-            type: "circle",
-            source: "traffic_lights",
-            layout: {
-              visibility: "visible",
-              "circle-sort-key": ["case", ["any", ["coalesce", ["get", "has_magnetometer"], false], ["coalesce", ["get", "has_xtream"], false]], 1, 0]
-            },
-            paint: {
-              "circle-color": [
-                "case",
-                ["==", ["coalesce", ["get", "has_magnetometer"], false], true], "#22c55e",
-                ["==", ["coalesce", ["get", "has_xtream"], false], true], "#22c55e",
-                "#64748b"
-              ],
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 4.5, 13, 7.5],
-              "circle-stroke-color": "#ffffff",
-              "circle-stroke-width": 1.2,
-              "circle-opacity": 0.9
-            }
-          },
-          {
-            id: "fid-traffic-lights-circle",
-            type: "circle",
-            source: "fid_traffic_lights",
-            layout: {
-              visibility: "visible",
-              "circle-sort-key": ["case", ["any", ["coalesce", ["get", "has_magnetometer"], false], ["coalesce", ["get", "has_xtream"], false]], 1, 0]
-            },
-            paint: {
-              "circle-color": [
-                "case",
-                ["==", ["coalesce", ["get", "has_magnetometer"], false], true], "#22c55e",
-                ["==", ["coalesce", ["get", "has_xtream"], false], true], "#22c55e",
-                "#64748b"
-              ],
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 5.5, 13, 8.5],
-              "circle-stroke-color": "#ffffff",
-              "circle-stroke-width": 1.3,
-              "circle-opacity": 0.95
-            }
-          },
-          {
-            id: "selected-traffic-light-circle",
-            type: "circle",
-            source: "selected_traffic_light",
-            layout: { visibility: "visible" },
-            paint: {
-              "circle-color": "#f8fafc",
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 7.0, 13, 10.5],
-              "circle-stroke-color": "#111827",
-              "circle-stroke-width": 1.5,
-              "circle-opacity": 0.95
-            }
-          },
-          {
-            id: "fid-anpr-line",
-            type: "line",
-            source: "fid_anpr",
-            paint: { "line-color": "#22c55e", "line-width": 3.5, "line-opacity": 0.9 }
-          },
-          {
-            id: "fid-anpr-point",
-            type: "circle",
-            source: "fid_anpr",
-            paint: { "circle-color": "#22c55e", "circle-radius": 5, "circle-opacity": 0.95, "circle-stroke-color": "#fff", "circle-stroke-width": 1 }
-          },
-          {
-            id: "fid-brussels-line",
-            type: "line",
-            source: "fid_brussels",
-            paint: { "line-color": "#f59e0b", "line-width": 3.5, "line-opacity": 0.9 }
-          },
-          {
-            id: "fid-brussels-point",
-            type: "circle",
-            source: "fid_brussels",
-            paint: { "circle-color": "#f59e0b", "circle-radius": 5, "circle-opacity": 0.95, "circle-stroke-color": "#fff", "circle-stroke-width": 1 }
-          },
-          {
-            id: "fid-waze-jam-line",
-            type: "line",
-            source: "fid_waze_jam",
-            paint: { "line-color": "#ef4444", "line-width": 3.5, "line-opacity": 0.9 }
-          },
-          {
-            id: "fid-waze-jam-point",
-            type: "circle",
-            source: "fid_waze_jam",
-            paint: { "circle-color": "#ef4444", "circle-radius": 5, "circle-opacity": 0.95, "circle-stroke-color": "#fff", "circle-stroke-width": 1 }
-          },
-          {
-            id: "fid-waze-alert-line",
-            type: "line",
-            source: "fid_waze_alert",
-            paint: { "line-color": "#3b82f6", "line-width": 3.5, "line-opacity": 0.9 }
-          },
-          {
-            id: "fid-waze-alert-point",
-            type: "circle",
-            source: "fid_waze_alert",
-            paint: { "circle-color": "#3b82f6", "circle-radius": 5, "circle-opacity": 0.95, "circle-stroke-color": "#fff", "circle-stroke-width": 1 }
-          },
-          {
-            id: "fid-tomtom-flow-line",
-            type: "line",
-            source: "fid_tomtom_flow",
-            paint: { "line-color": "#06b6d4", "line-width": 3.5, "line-opacity": 0.9 }
-          },
-          {
-            id: "fid-tomtom-flow-point",
-            type: "circle",
-            source: "fid_tomtom_flow",
-            paint: { "circle-color": "#06b6d4", "circle-radius": 5, "circle-opacity": 0.95, "circle-stroke-color": "#fff", "circle-stroke-width": 1 }
-          },
-          {
-            id: "fid-tomtom-incident-line",
-            type: "line",
-            source: "fid_tomtom_incident",
-            paint: { "line-color": "#8b5cf6", "line-width": 3.5, "line-opacity": 0.9 }
-          },
-          {
-            id: "fid-tomtom-incident-point",
-            type: "circle",
-            source: "fid_tomtom_incident",
-            paint: { "circle-color": "#8b5cf6", "circle-radius": 5, "circle-opacity": 0.95, "circle-stroke-color": "#fff", "circle-stroke-width": 1 }
-          },
-          {
-            id: "fid-transport-point",
-            type: "circle",
-            source: "fid_transport",
-            layout: { visibility: "none" },
-            paint: {
-              "circle-radius": 6,
-              "circle-opacity": 0.95,
-              "circle-stroke-color": "#fff",
-              "circle-stroke-width": 1.5,
-              "circle-color": [
-                "match", ["get", "severity"],
-                "high", "#ef4444",
-                "medium", "#f59e0b",
-                "low", "#facc15",
-                "#06b6d4"
-              ]
             }
           }
         ]
@@ -2735,23 +2206,7 @@
         // is off), do a one-shot fetch for transport so the comparison
         // can render immediately. Defaults to J−7 — same default as the
         // app-level offset input.
-        if (_transportCompareEnabled
-            && selectedFid != null
-            && (!_lastTransportRefRows || !_lastTransportRefRows.length)) {
-          try {
-            const refDays = parseInt(document.getElementById("refOffsetDays").value || "7", 10) || 7;
-            const url = `/api/fid/${selectedFid}/stats?${currentTimeQuery()}&bin_minutes=${BIN_MINUTES}&ref_offset_days=${refDays}`;
-            const resp = await fetch(url);
-            const data = await resp.json();
-            if (data && data.ok) {
-              const refSeries = data.ref_series || {};
-              _lastTransportRefRows = Array.isArray(refSeries.transport) ? refSeries.transport : null;
-              _lastTransportRefLabel = data.ref_label || `J−${refDays}`;
-            }
-          } catch (err) {
-            console.warn("[transport compare] auto-fetch ref failed:", err);
-          }
-        }
+        // (Geolink fid stats endpoint removed in STIB-only build.)
         updateMetricChart("transport", _lastTransportRows, _lastTransportRefRows, _lastTransportRefLabel);
         return;
       }
@@ -2922,90 +2377,10 @@
           if (id && map.getLayer(id)) map.setLayoutProperty(id, "visibility", visibility);
         });
       });
-      await loadGeolinkSegments();
     });
 
-    map.on("mouseenter", "geolink-segments-line", () => { map.getCanvas().style.cursor = "pointer"; });
-    map.on("mouseleave", "geolink-segments-line", () => { map.getCanvas().style.cursor = ""; });
-    map.on("mouseenter", "traffic-lights-circle", () => { map.getCanvas().style.cursor = "pointer"; });
-    map.on("mouseleave", "traffic-lights-circle", () => { map.getCanvas().style.cursor = ""; });
-    map.on("mouseenter", "fid-traffic-lights-circle", () => { map.getCanvas().style.cursor = "pointer"; });
-    map.on("mouseleave", "fid-traffic-lights-circle", () => { map.getCanvas().style.cursor = ""; });
-    map.on("click", "geolink-segments-line", async (ev) => {
-      const feature = ev && ev.features && ev.features[0];
-      if (!feature || !feature.properties) return;
-      const fidRaw = feature.properties.fid;
-      const fid = Number.parseInt(fidRaw, 10);
-      if (!Number.isFinite(fid)) return;
-
-      selectedFid = fid;
-      document.getElementById("selectedFidMeta").textContent = `Selected fid: ${fid}`;
-      if (filterTrafficLightsBySelectedFid) {
-        await ensureTrafficLightsLoaded();
-      }
-      const trafficLightView = applyTrafficLightFidFilter();
-      if (filterTrafficLightsBySelectedFid) {
-        document.getElementById("status").textContent = `Loading overlays and stats for fid=${fid} (traffic lights shown on segment: ${trafficLightView.shown})...`;
-      } else {
-        document.getElementById("status").textContent = `Loading overlays and stats for fid=${fid}...`;
-      }
-      await Promise.all([refreshFidGeometries(fid), refreshFidCharts(fid)]);
-    });
-
-    async function handleTrafficLightFeatureClick(feature) {
-      if (!feature || !feature.properties) return;
-      const signalgroupId = String(feature.properties.signalgroup_id || "").trim();
-      const signalgroupNum = Number.parseInt(feature.properties.signalgroup_num, 10);
-      if (!signalgroupId || !Number.isFinite(signalgroupNum)) return;
-
-      selectedTrafficLight = {
-        signalgroup_id: signalgroupId,
-        signalgroup_num: signalgroupNum,
-      };
-      setSourceData("selected_traffic_light", { type: "FeatureCollection", features: [feature] });
-      document.getElementById("selectedTrafficLightMeta").textContent = `Selected traffic light: ${signalgroupId}/${signalgroupNum}`;
-      document.getElementById("status").textContent = `Loading latest cycle for traffic light ${signalgroupId}/${signalgroupNum}...`;
-
-      let latestPayload = null;
-      try {
-        latestPayload = await refreshTrafficLightLatestCycle(signalgroupId, signalgroupNum);
-        showTrafficLightInfoPopup(feature, latestPayload);
-      } catch (err) {
-        latestTrafficLightSeries = null;
-        clearTrafficLightChart();
-        setTrafficLightPanelVisible(false);
-        showTrafficLightInfoPopup(feature, null);
-        document.getElementById("status").textContent = `Traffic light cycle error for ${signalgroupId}/${signalgroupNum}: ${err.message || err}`;
-        return;
-      }
-
-      const hasMagneto = latestPayload && latestPayload.has_magnetometer;
-      const hasXtream = feature.properties && feature.properties.has_xtream;
-      const movementName = feature.properties && feature.properties.movement_name;
-
-      if (hasMagneto) {
-        document.getElementById("status").textContent = `Loading traffic light chart for ${signalgroupId}/${signalgroupNum}...`;
-        await refreshTrafficLightCapacity(signalgroupId, signalgroupNum);
-      } else if (hasXtream && movementName) {
-        document.getElementById("status").textContent = `Loading Xtream camera chart for ${signalgroupId}/${movementName}...`;
-        await refreshXtreamCapacity(signalgroupId, movementName);
-      } else {
-        latestTrafficLightSeries = null;
-        clearTrafficLightChart();
-        setTrafficLightPanelVisible(false);
-        document.getElementById("status").textContent = `Traffic light ${signalgroupId}/${signalgroupNum}: latest cycle loaded (no sensor mapping, chart unavailable).`;
-      }
-    }
-
-    map.on("click", "traffic-lights-circle", async (ev) => {
-      const feature = ev && ev.features && ev.features[0];
-      await handleTrafficLightFeatureClick(feature);
-    });
-
-    map.on("click", "fid-traffic-lights-circle", async (ev) => {
-      const feature = ev && ev.features && ev.features[0];
-      await handleTrafficLightFeatureClick(feature);
-    });
+    // (Legacy geolink / traffic-light / fid event handlers removed
+    //  — corresponding backend endpoints were trimmed for STIB-only build.)
 
     // STIB stop click → popup with bilingual name + coloured line badges.
     let stibStopPopup = null;
@@ -3155,21 +2530,10 @@
       }
     });
 
-    map.on("click", (ev) => {
-      const candidateLayers = [
-        "geolink-segments-line",
-        "selected-segment-line",
-        "traffic-lights-circle",
-        "fid-traffic-lights-circle",
-        "selected-traffic-light-circle",
-      ].filter((layerId) => map.getLayer(layerId));
-      if (!candidateLayers.length) return;
-      const hits = map.queryRenderedFeatures(ev.point, { layers: candidateLayers });
-      if (hits && hits.length) return;
-      clearAllSelections();
-    });
+    // (Background click → clearAllSelections handler removed; STIB-only
+    //  build has no fid / traffic-light selection state to clear.)
 
-    document.getElementById("status").textContent = "Loading geolink segments...";
+    document.getElementById("status").textContent = "Ready.";
 
     /* ──────────────────────────────────────────────────────────────────────
        Transports panel — STIB line filter (segments + stops)
@@ -4026,58 +3390,16 @@
     // Top-left "Transport" checkbox → toggles the whole bottom-left panel
     const transportPanelToggleEl = document.getElementById("transportPanelToggle");
     const transportsPanelVisEl = document.getElementById("transportsPanel");
-    // ── Segment alerts toggles (bottom-left Transports panel) ──────
-    // Three independent toggles, each activates a dedicated MapLibre layer
-    // that colors every geolink fid by one metric (cyan → red) like TomTom
-    // flow. All three layers read the same shared `transport_segments`
-    // tile source (which now exposes stuck_count alongside proximity_count
-    // and slow_speed_count).
-    const _segAlertState = { proximity: false, slow_speed: false, stuck: false };
-
-    function _segAlertApply(metric) {
-      const on = _segAlertState[metric];
-      const layerId = `segment-alert-${metric.replace("_", "-")}`;
-      if (on) ensureTileSource("transport_segments");
-      if (map.getLayer(layerId)) {
-        map.setLayoutProperty(layerId, "visibility", on ? "visible" : "none");
-      }
-    }
-
-    function _segAlertToggle(metric) {
-      _segAlertState[metric] = !_segAlertState[metric];
-      _segAlertApply(metric);
-      const btn = document.getElementById(
-        metric === "proximity" ? "segAlertProx"
-        : metric === "slow_speed" ? "segAlertSlow"
-        : "segAlertStuck"
-      );
-      if (btn) btn.classList.toggle("active", _segAlertState[metric]);
-    }
-
-    {
-      const _segProxBtn  = document.getElementById("segAlertProx");
-      const _segSlowBtn  = document.getElementById("segAlertSlow");
-      const _segStuckBtn = document.getElementById("segAlertStuck");
-      if (_segProxBtn)  _segProxBtn.addEventListener("click",  () => _segAlertToggle("proximity"));
-      if (_segSlowBtn)  _segSlowBtn.addEventListener("click",  () => _segAlertToggle("slow_speed"));
-      if (_segStuckBtn) _segStuckBtn.addEventListener("click", () => _segAlertToggle("stuck"));
-    }
-
     transportPanelToggleEl.addEventListener("change", () => {
       const on = transportPanelToggleEl.checked;
       transportsPanelVisEl.style.display = on ? "" : "none";
       if (!on) {
         // Hide everything on the map when the panel is closed
         tpSetLayerVisibility(["stib-lines-casing", "stib-lines-line", "stib-stops-circle", "stib-vehicles-halo", "stib-vehicles-circle", "stib-vehicles-label", "stib-vehicles-trip-label", "stib-alerts-pulse", "stib-alerts-circle", "stib-alerts-label"], false);
-        tpSetLayerVisibility(["delijn-lines-casing", "delijn-lines-line", "delijn-stops-circle", "delijn-vehicles-halo", "delijn-vehicles-circle", "delijn-vehicles-label", "delijn-vehicles-trip-label"], false);
         tpPausePlayer();
-        dlPausePlayer();
         tpShowTemporalUI(false);
-        const dlTemp = document.getElementById("tpDlTemporal");
-        if (dlTemp) dlTemp.style.display = "none";
       } else {
         tpApplyToMap();
-        dlApplyToMap();
       }
     });
     document.getElementById("tpToggleSegments").addEventListener("click", function () {
@@ -4155,11 +3477,9 @@
     // Operator/STIB level navigation
     const tpLevelOperatorsEl = document.getElementById("tpLevelOperators");
     const tpLevelStibEl      = document.getElementById("tpLevelStib");
-    const tpLevelDelijnEl = document.getElementById("tpLevelDelijn");
     function tpShowLevel(name) {
       tpLevelOperatorsEl.style.display = (name === "operators") ? "" : "none";
       tpLevelStibEl.style.display      = (name === "stib")      ? "" : "none";
-      tpLevelDelijnEl.style.display    = (name === "delijn")    ? "" : "none";
     }
     document.querySelectorAll(".tp-op-card").forEach((card) => {
       card.addEventListener("click", () => {
@@ -4168,9 +3488,6 @@
         if (op === "stib") {
           tpShowLevel("stib");
           tpApplyToMap();
-        } else if (op === "delijn") {
-          tpShowLevel("delijn");
-          dlApplyToMap();
         }
       });
     });
@@ -4266,51 +3583,6 @@
     _bindStibSlider("tpSliderAlerts",    "alerts");
 
     /* ──────────────────────────────────────────────────────────────────────
-       Opacity — De Lijn layers (per-toggle slider)
-       ─────────────────────────────────────────────────────────────────── */
-    const _dlOpacity = { segments: 1, stops: 1, vehicles: 1, alerts: 1 };
-    function _applyDlOpacity() {
-      const segO = _dlOpacity.segments;
-      if (map.getLayer("delijn-lines-line"))   map.setPaintProperty("delijn-lines-line", "line-opacity", segO);
-      if (map.getLayer("delijn-lines-casing")) map.setPaintProperty("delijn-lines-casing", "line-opacity", segO * 0.35);
-      const stO = _dlOpacity.stops;
-      if (map.getLayer("delijn-stops-circle")) {
-        map.setPaintProperty("delijn-stops-circle", "circle-opacity", stO * 0.95);
-        map.setPaintProperty("delijn-stops-circle", "circle-stroke-opacity", stO);
-      }
-      const vO = _dlOpacity.vehicles;
-      if (map.getLayer("delijn-vehicles-halo"))   map.setPaintProperty("delijn-vehicles-halo", "circle-opacity", vO * 0.35);
-      if (map.getLayer("delijn-vehicles-circle")) {
-        map.setPaintProperty("delijn-vehicles-circle", "circle-opacity", vO);
-        map.setPaintProperty("delijn-vehicles-circle", "circle-stroke-opacity", vO);
-      }
-      if (map.getLayer("delijn-vehicles-label"))      map.setPaintProperty("delijn-vehicles-label", "text-opacity", vO);
-      if (map.getLayer("delijn-vehicles-trip-label")) map.setPaintProperty("delijn-vehicles-trip-label", "text-opacity", vO);
-      const aO = _dlOpacity.alerts;
-      if (map.getLayer("delijn-alerts-pulse"))  map.setPaintProperty("delijn-alerts-pulse",  "circle-opacity", aO * 0.25);
-      if (map.getLayer("delijn-alerts-circle")) {
-        map.setPaintProperty("delijn-alerts-circle", "circle-opacity", aO * 0.9);
-        map.setPaintProperty("delijn-alerts-circle", "circle-stroke-opacity", aO);
-      }
-      if (map.getLayer("delijn-alerts-label"))  map.setPaintProperty("delijn-alerts-label",  "text-opacity", aO);
-    }
-    function _bindDlSlider(rowId, key) {
-      const row = document.getElementById(rowId);
-      if (!row) return;
-      const slider = row.querySelector('input[type="range"]');
-      const valEl  = row.querySelector(".opacity-val");
-      slider.addEventListener("input", () => {
-        _dlOpacity[key] = Number(slider.value) / 100;
-        if (valEl) valEl.textContent = slider.value + "%";
-        _applyDlOpacity();
-      });
-    }
-    _bindDlSlider("tpDlSliderSegments",  "segments");
-    _bindDlSlider("tpDlSliderStops",     "stops");
-    _bindDlSlider("tpDlSliderVehicles",  "vehicles");
-    _bindDlSlider("tpDlSliderAlerts",    "alerts");
-
-    /* ──────────────────────────────────────────────────────────────────────
        Trip labels — daily trip counter (e.g. 71_1, 71_2) ordered by start_ts
        ─────────────────────────────────────────────────────────────────── */
     function tpComputeTripLabels(trajectories) {
@@ -4345,816 +3617,6 @@
       return labelMap;
     }
 
-    /* ──────────────────────────────────────────────────────────────────────
-       De Lijn — vehicle display (same pattern as STIB above)
-       ─────────────────────────────────────────────────────────────────── */
-    const DELIJN_FALLBACK_COLOR = "#0078C8";
-    const DELIJN_FALLBACK_TEXT  = "#FFFFFF";
-
-    /** Return "#000000" for light backgrounds, "#FFFFFF" for dark ones (WCAG luminance). */
-    function dlContrastText(hex) {
-      if (!hex || typeof hex !== "string") return "#FFFFFF";
-      let h = hex.replace(/^#/, "");
-      if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
-      if (h.length !== 6) return "#FFFFFF";
-      const r = parseInt(h.substring(0, 2), 16) / 255;
-      const g = parseInt(h.substring(2, 4), 16) / 255;
-      const b = parseInt(h.substring(4, 6), 16) / 255;
-      const sR = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
-      const sG = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
-      const sB = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
-      const L = 0.2126 * sR + 0.7152 * sG + 0.0722 * sB;
-      return L > 0.179 ? "#000000" : "#FFFFFF";
-    }
-    const dlTp = {
-      catalog: [],
-      selected: new Set(),
-      showSegments: false,
-      showStops: false,
-      showVehicles: false,
-      showAlerts: false,
-      vehicleSourceAdded: false,
-      trajectories: [],
-      windowStartMs: null,
-      windowEndMs: null,
-      playheadMs: null,
-      playing: false,
-      speed: 1,
-      rafId: null,
-      lastTickWall: null,
-      loadingTrajectories: false,
-      tripLabelMap: {},
-    };
-
-    function dlTileUrl(layer) {
-      const base = window.location.origin.replace(/\/$/, "");
-      const parts = [currentTimeQuery()];
-      parts.push("lines=" + encodeURIComponent(Array.from(dlTp.selected).join(",") || "__none__"));
-      return `${base}/tiles/${layer}/{z}/{x}/{y}.pbf?${parts.filter(Boolean).join("&")}`;
-    }
-    function dlEnsureLines() {
-      ensureTileSource("delijn_lines");
-      const src = map.getSource("delijn_lines");
-      if (src) src.setTiles([dlTileUrl("delijn_lines")]);
-    }
-    function dlEnsureStops() {
-      ensureTileSource("delijn_stops");
-      const src = map.getSource("delijn_stops");
-      if (src) src.setTiles([dlTileUrl("delijn_stops")]);
-    }
-
-    /* ── De Lijn stop click popup ── */
-    let dlStopPopup = null;
-    function clearDlStopPopup() {
-      if (dlStopPopup) { dlStopPopup.remove(); dlStopPopup = null; }
-    }
-    function dlLineBadge(line) {
-      const lid = escapeHtml(line.lineid || "?");
-      const bg = line.color ? (line.color.startsWith("#") ? line.color : "#" + line.color) : "#0078C8";
-      const fg = dlContrastText(bg);
-      return `<span style="display:inline-block;min-width:26px;padding:3px 8px;margin:2px 6px 2px 0;background:${escapeHtml(bg)};color:${fg};font-weight:800;border-radius:6px;text-align:center;font-size:13px;font-family:system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,0.25)">${lid}</span>`;
-    }
-    function dlLineRow(line) {
-      const modeLetter = { metro: "M", tram: "T", bus: "B", rail: "R" };
-      const badge = dlLineBadge(line);
-      const ml = modeLetter[line.mode] || "B";
-      return `<div style="display:flex;align-items:center;margin:3px 0"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:800;color:#fff;margin-right:3px;background:#0078C8;flex-shrink:0">${ml}</span>${badge}</div>`;
-    }
-    map.on("click", "delijn-stops-circle", async (ev) => {
-      const feature = ev && ev.features && ev.features[0];
-      if (!feature) return;
-      const stopId = feature.properties && feature.properties.stop_id;
-      if (!stopId) return;
-      const [lng, lat] = feature.geometry.coordinates.slice(0, 2);
-      clearDlStopPopup();
-      dlStopPopup = new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: "360px", className: "stib-stop-popup" })
-        .setLngLat([lng, lat])
-        .setHTML('<div style="font:12px/1.4 system-ui,sans-serif;color:#111;background:#fff;padding:8px 10px;border-radius:6px"><b>Loading…</b></div>')
-        .addTo(map);
-      try {
-        const resp = await fetch(`/api/delijn/stop/${encodeURIComponent(stopId)}`);
-        const data = await resp.json();
-        if (!data.ok) throw new Error(data.error || "stop not found");
-        const name = data.stop_name || "(sans nom)";
-        const lines = Array.isArray(data.lines) ? data.lines : [];
-        const linesHtml = lines.length
-          ? '<div style="margin-top:8px">' + lines.map(dlLineRow).join("") + '</div>'
-          : '<div style="margin-top:8px;color:#6b7280;font-size:12px">Aucune ligne enregistree.</div>';
-        const html = `<div style="font:12px/1.4 system-ui,-apple-system,sans-serif;color:#111827;background:#ffffff;padding:10px 12px;border-radius:6px;min-width:220px"><div style="font-size:15px;font-weight:800;color:#111827">${escapeHtml(name)}</div><div style="color:#9ca3af;font-size:10px;margin-top:2px">De Lijn — ${escapeHtml(stopId)}</div>${linesHtml}</div>`;
-        dlStopPopup.setHTML(html);
-      } catch (err) {
-        dlStopPopup.setHTML(`<div style="font:12px system-ui,sans-serif;color:#b91c1c;background:#fff;padding:8px 10px;border-radius:6px">Erreur: ${escapeHtml(err.message || err)}</div>`);
-      }
-    });
-    map.on("mouseenter", "delijn-stops-circle", () => { map.getCanvas().style.cursor = "pointer"; });
-    map.on("mouseleave", "delijn-stops-circle", () => {
-      map.getCanvas().style.cursor = "";
-      const tt = document.getElementById("delijnStopHoverTooltip");
-      if (tt) tt.style.display = "none";
-      _dlHoverStopId = null;
-    });
-
-    /* ── De Lijn stop hover tooltip (high zoom) ── */
-    const _dlStopHoverCache = {};
-    let _dlHoverStopId = null;
-
-    function _dlBuildHoverHtml(info) {
-      let h = `<div style="font-weight:700;font-size:13px;margin-bottom:4px">${escapeHtml(info.name)}</div>`;
-      if (info.lines && info.lines.length) {
-        info.lines.forEach((l) => {
-          h += `<div style="display:flex;align-items:center;margin:2px 0">${dlLineBadge(l)}</div>`;
-        });
-      }
-      return h;
-    }
-
-    map.on("mousemove", "delijn-stops-circle", async (ev) => {
-      if (map.getZoom() < 14.5) {
-        const tt = document.getElementById("delijnStopHoverTooltip");
-        if (tt) tt.style.display = "none";
-        return;
-      }
-      const feature = ev && ev.features && ev.features[0];
-      if (!feature) return;
-      const stopId = feature.properties && feature.properties.stop_id;
-      if (!stopId) return;
-
-      const tt = document.getElementById("delijnStopHoverTooltip");
-      if (!tt) return;
-
-      const mapContainer = map.getContainer();
-      const rect = mapContainer.getBoundingClientRect();
-      let left = ev.originalEvent.clientX - rect.left + 14;
-      let top  = ev.originalEvent.clientY - rect.top - 10;
-      if (left + 320 > rect.width) left = left - 340;
-      if (top + 200 > rect.height) top = Math.max(0, top - 160);
-      tt.style.left = left + "px";
-      tt.style.top  = top + "px";
-
-      if (_dlHoverStopId === stopId) { tt.style.display = "block"; return; }
-      _dlHoverStopId = stopId;
-
-      if (_dlStopHoverCache[stopId]) {
-        tt.innerHTML = _dlBuildHoverHtml(_dlStopHoverCache[stopId]);
-        tt.style.display = "block";
-        return;
-      }
-
-      tt.innerHTML = `<div style="color:#6b7280">Loading…</div>`;
-      tt.style.display = "block";
-
-      try {
-        const resp = await fetch(`/api/delijn/stop/${encodeURIComponent(stopId)}`);
-        const data = await resp.json();
-        if (!data.ok) throw new Error("not found");
-        const info = {
-          name: data.stop_name || "(sans nom)",
-          lines: Array.isArray(data.lines) ? data.lines : [],
-        };
-        _dlStopHoverCache[stopId] = info;
-        if (_dlHoverStopId === stopId) {
-          tt.innerHTML = _dlBuildHoverHtml(info);
-          tt.style.display = "block";
-        }
-      } catch (err) {
-        if (_dlHoverStopId === stopId) {
-          tt.innerHTML = `<div style="color:#b91c1c">Erreur</div>`;
-        }
-      }
-    });
-
-    function dlEnsureVehicleLayer() {
-      if (dlTp.vehicleSourceAdded) return;
-      if (map.getSource("delijn_vehicles")) { dlTp.vehicleSourceAdded = true; return; }
-      map.addSource("delijn_vehicles", {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-      });
-      map.addLayer({
-        id: "delijn-vehicles-halo",
-        type: "circle",
-        source: "delijn_vehicles",
-        paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 9, 15, 16],
-          "circle-color": "#000",
-          "circle-opacity": 0.35,
-          "circle-blur": 0.6,
-        },
-      });
-      map.addLayer({
-        id: "delijn-vehicles-circle",
-        type: "circle",
-        source: "delijn_vehicles",
-        paint: {
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 15, 13],
-          "circle-color": [
-            "case",
-            ["all", ["has", "route_color"], ["!=", ["get", "route_color"], null]],
-            ["get", "route_color"],
-            DELIJN_FALLBACK_COLOR
-          ],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 1.5,
-        },
-      });
-      map.addLayer({
-        id: "delijn-vehicles-label",
-        type: "symbol",
-        source: "delijn_vehicles",
-        layout: {
-          "text-field": ["get", "lineid"],
-          "text-size": ["interpolate", ["linear"], ["zoom"], 10, 9, 15, 13],
-          "text-font": ["Noto Sans Bold"],
-          "text-allow-overlap": true,
-          "text-ignore-placement": true,
-        },
-        paint: {
-          "text-color": [
-            "case",
-            ["all", ["has", "route_text_color"], ["!=", ["get", "route_text_color"], null]],
-            ["get", "route_text_color"],
-            "#ffffff"
-          ],
-          "text-halo-color": "rgba(0,0,0,0.35)",
-          "text-halo-width": 0.8,
-        },
-      });
-      map.addLayer({
-        id: "delijn-vehicles-trip-label",
-        type: "symbol",
-        source: "delijn_vehicles",
-        layout: {
-          "text-field": ["get", "trip_label"],
-          "text-size": ["interpolate", ["linear"], ["zoom"], 10, 8, 14, 11, 16, 13],
-          "text-font": ["Noto Sans Bold"],
-          "text-allow-overlap": true,
-          "text-ignore-placement": true,
-          "text-offset": [0, -2.2],
-          "text-anchor": "bottom",
-        },
-        paint: {
-          "text-color": "#f8fafc",
-          "text-halo-color": "#0f172a",
-          "text-halo-width": 2,
-        },
-      });
-      dlTp.vehicleSourceAdded = true;
-      bringInteractiveLayersToFront && bringInteractiveLayersToFront();
-    }
-
-    async function dlFetchTrajectories() {
-      if (dlTp.loadingTrajectories) return;
-      if (!dlTp.showVehicles || dlTp.selected.size === 0) return;
-      dlTp.loadingTrajectories = true;
-      const _dlCountEl = document.getElementById("tpDlVehicleCount");
-      if (_dlCountEl) _dlCountEl.textContent = "⏳ loading…";
-      try {
-        const tq = currentTimeQuery();
-        const linesParam = "lines=" + encodeURIComponent(Array.from(dlTp.selected).join(","));
-        const sampleParam = "sample=" + encodeURIComponent(adaptiveSampleInterval());
-        const qs = [tq, linesParam, sampleParam].filter(Boolean).join("&");
-        const resp = await fetch("/api/delijn/trajectories?" + qs);
-        const data = await resp.json();
-        const prevPlayhead = dlTp.playheadMs;
-        dlTp.trajectories  = Array.isArray(data.trips) ? data.trips : [];
-        dlTp.tripLabelMap  = tpComputeTripLabels(dlTp.trajectories);
-        dlTp.windowStartMs = data.window_start_ms || null;
-        dlTp.windowEndMs   = data.window_end_ms   || null;
-        await tpEnsureShapesLoaded(dlTp.trajectories);
-        const dlLatestMs = latestSampleMs(dlTp.trajectories);
-        const dlDefaultPh = (dlLatestMs != null) ? dlLatestMs - PLAY_END_BUFFER_MS : null;
-        if (prevPlayhead == null) {
-          dlTp.playheadMs = dlDefaultPh;
-        } else if (dlDefaultPh != null) {
-          dlTp.playheadMs = Math.max(dlTp.windowStartMs || 0, Math.min(prevPlayhead, dlDefaultPh));
-        }
-        dlSyncSliderBounds();
-        dlRenderVehicleFrame();
-        const countEl = document.getElementById("tpDlVehicleCount");
-        if (countEl) countEl.textContent = dlTp.trajectories.length ? `(${dlTp.trajectories.length})` : "";
-      } catch (err) {
-        console.error("[delijn] trajectories fetch failed:", err);
-      } finally {
-        dlTp.loadingTrajectories = false;
-      }
-    }
-
-    function dlRenderVehicleFrame() {
-      const src = map.getSource("delijn_vehicles");
-      if (!src) return;
-      const t = dlTp.playheadMs;
-      const features = [];
-      if (t != null) {
-        for (const trip of dlTp.trajectories) {
-          if (t < trip.samples[0][0] || t > trip.samples[trip.samples.length - 1][0]) continue;
-          const pt = tpInterpolateTrip(trip, t);
-          if (!pt) continue;
-          features.push({
-            type: "Feature",
-            geometry: { type: "Point", coordinates: pt },
-            properties: {
-              trip_id: trip.trip_id,
-              lineid: trip.route_short_name || trip.lineid,
-              trip_label: trip.line_trip_id || ((dlTp.tripLabelMap && dlTp.tripLabelMap[trip.trip_id]) || trip.route_short_name || trip.lineid),
-              mode: trip.mode || "bus",
-              route_color: trip.route_color || DELIJN_FALLBACK_COLOR,
-              route_text_color: dlContrastText(trip.route_color || DELIJN_FALLBACK_COLOR),
-              vehicle_id: trip.vehicle_id,
-            },
-          });
-        }
-      }
-      src.setData({ type: "FeatureCollection", features });
-      dlUpdateTimestampLabel();
-      // Refresh + render De Lijn alerts each frame
-      refreshDelijnAlerts();
-      renderDlAlertFrame();
-    }
-
-    function dlUpdateTimestampLabel() {
-      const el = document.getElementById("tpDlTimestamp");
-      if (!el) return;
-      if (dlTp.playheadMs == null) { el.textContent = "—"; return; }
-      const d = new Date(dlTp.playheadMs);
-      const pad = (n) => String(n).padStart(2, "0");
-      el.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    }
-
-    function dlSyncSliderBounds() {
-      const slider = document.getElementById("tpDlSlider");
-      if (!slider || dlTp.windowStartMs == null || dlTp.windowEndMs == null) return;
-      const dur = dlTp.windowEndMs - dlTp.windowStartMs;
-      slider.min = 0;
-      slider.max = Math.max(1, dur);
-      slider.value = dlTp.playheadMs != null ? (dlTp.playheadMs - dlTp.windowStartMs) : dur;
-    }
-
-    function dlSyncSliderFromPlayhead() {
-      const slider = document.getElementById("tpDlSlider");
-      if (!slider || dlTp.windowStartMs == null) return;
-      slider.value = dlTp.playheadMs - dlTp.windowStartMs;
-    }
-
-    function dlPlayLoop(nowWall) {
-      if (!dlTp.playing) return;
-      if (dlTp.lastTickWall != null) {
-        const dt = (nowWall - dlTp.lastTickWall) * dlTp.speed;
-        const latestMs = latestSampleMs(dlTp.trajectories);
-        const maxPh = (latestMs != null) ? (latestMs - PLAY_END_BUFFER_MS) : null;
-        dlTp.playheadMs += dt;
-        if (maxPh != null && dlTp.playheadMs > maxPh) {
-          dlTp.playheadMs = maxPh;
-        }
-        dlRenderVehicleFrame();
-        dlSyncSliderFromPlayhead();
-      }
-      dlTp.lastTickWall = nowWall;
-      dlTp.rafId = requestAnimationFrame(dlPlayLoop);
-    }
-
-    function dlStartPlayer() {
-      if (dlTp.windowStartMs == null || dlTp.windowEndMs == null) return;
-      const _latest = latestSampleMs(dlTp.trajectories);
-      const _maxPh = _latest != null ? _latest - PLAY_END_BUFFER_MS : dlTp.windowEndMs;
-      if (dlTp.playheadMs == null || dlTp.playheadMs >= _maxPh - 500) {
-        dlTp.playheadMs = dlTp.windowStartMs;
-      }
-      dlTp.playing = true;
-      dlTp.lastTickWall = null;
-      const btn = document.getElementById("tpDlPlayBtn");
-      if (btn) { btn.textContent = "⏸"; btn.classList.add("playing"); }
-      dlTp.rafId = requestAnimationFrame(dlPlayLoop);
-      if (!dlTp.autoRefreshTimer) {
-        dlTp.autoRefreshTimer = setInterval(() => {
-          if (dlTp.showVehicles && dlTp.selected.size > 0) dlFetchTrajectories();
-        }, 15000);
-      }
-    }
-
-    function dlPausePlayer() {
-      dlTp.playing = false;
-      if (dlTp.rafId) { cancelAnimationFrame(dlTp.rafId); dlTp.rafId = null; }
-      dlTp.lastTickWall = null;
-      const btn = document.getElementById("tpDlPlayBtn");
-      if (btn) { btn.textContent = "▶"; btn.classList.remove("playing"); }
-      if (dlTp.autoRefreshTimer) {
-        clearInterval(dlTp.autoRefreshTimer);
-        dlTp.autoRefreshTimer = null;
-      }
-    }
-
-    function dlClearVehicleLayer() {
-      const src = map.getSource("delijn_vehicles");
-      if (src) src.setData({ type: "FeatureCollection", features: [] });
-      const countEl = document.getElementById("tpDlVehicleCount");
-      if (countEl) countEl.textContent = "";
-    }
-
-    function dlApplyToMap() {
-      const hasSelection = dlTp.selected.size > 0;
-      const showSegs   = hasSelection && dlTp.showSegments;
-      const showStops  = hasSelection && dlTp.showStops;
-      const showVeh    = hasSelection && dlTp.showVehicles;
-      const showAlerts = hasSelection && dlTp.showAlerts;
-      // Segments
-      if (showSegs) {
-        dlEnsureLines();
-        tpSetLayerVisibility(["delijn-lines-casing", "delijn-lines-line"], true);
-      } else {
-        tpSetLayerVisibility(["delijn-lines-casing", "delijn-lines-line"], false);
-      }
-      // Stops
-      if (showStops) {
-        dlEnsureStops();
-        tpSetLayerVisibility(["delijn-stops-circle"], true);
-      } else {
-        tpSetLayerVisibility(["delijn-stops-circle"], false);
-      }
-      // Line width emphasis
-      const emph = dlTp.selected.size > 0 && dlTp.selected.size <= 5;
-      const w  = emph
-        ? ["interpolate", ["linear"], ["zoom"], 9, 2.8, 14, 6.5]
-        : ["interpolate", ["linear"], ["zoom"], 9, 1.8, 14, 4.2];
-      const wc = emph
-        ? ["interpolate", ["linear"], ["zoom"], 9, 4.5, 14, 9.5]
-        : ["interpolate", ["linear"], ["zoom"], 9, 3.0, 14, 6.5];
-      if (map.getLayer("delijn-lines-line"))   map.setPaintProperty("delijn-lines-line",   "line-width", w);
-      if (map.getLayer("delijn-lines-casing")) map.setPaintProperty("delijn-lines-casing", "line-width", wc);
-      // Vehicles
-      if (showVeh) {
-        dlEnsureVehicleLayer();
-        tpSetLayerVisibility(["delijn-vehicles-halo", "delijn-vehicles-circle", "delijn-vehicles-label", "delijn-vehicles-trip-label"], true);
-        const el = document.getElementById("tpDlTemporal");
-        if (el) el.style.display = "";
-        dlFetchTrajectories();
-      } else {
-        tpSetLayerVisibility(["delijn-vehicles-halo", "delijn-vehicles-circle", "delijn-vehicles-label", "delijn-vehicles-trip-label"], false);
-        dlPausePlayer();
-        const el = document.getElementById("tpDlTemporal");
-        if (el) el.style.display = "none";
-        dlClearVehicleLayer();
-      }
-      // Alerts (independent of Vehicles)
-      if (showAlerts) {
-        ensureDlAlertLayers();
-        tpSetLayerVisibility(["delijn-alerts-pulse", "delijn-alerts-circle", "delijn-alerts-label"], true);
-        refreshDelijnAlerts();
-      } else {
-        tpSetLayerVisibility(["delijn-alerts-pulse", "delijn-alerts-circle", "delijn-alerts-label"], false);
-      }
-    }
-
-    function dlRenderLineList() {
-      const container = document.getElementById("tpDlLinesList");
-      if (!container) return;
-      if (!dlTp.catalog.length) {
-        container.innerHTML = '<div class="tp-empty">No lines available.</div>';
-        return;
-      }
-      // Group by route number ranges
-      let html = '<div class="tp-group-title">Bus / Tram</div><div class="tp-chips">';
-      dlTp.catalog.forEach((line) => {
-        const lid = escapeHtml(line.lineid || "?");
-        const label = escapeHtml(line.route_short_name || line.lineid || "?");
-        const bg  = line.route_color || DELIJN_FALLBACK_COLOR;
-        const fg  = dlContrastText(bg);
-        const active = dlTp.selected.has(line.lineid) ? " active" : "";
-        html += `<span class="tp-chip${active}" data-lineid="${lid}" style="background:${escapeHtml(bg)};color:${escapeHtml(fg)}">${label}</span>`;
-      });
-      html += "</div>";
-      container.innerHTML = html;
-      container.querySelectorAll(".tp-chip").forEach((el) => {
-        el.addEventListener("click", () => {
-          const lid = el.getAttribute("data-lineid");
-          if (dlTp.selected.has(lid)) dlTp.selected.delete(lid);
-          else dlTp.selected.add(lid);
-          el.classList.toggle("active");
-          dlApplyToMap();
-          dlRenderLegend();
-        });
-      });
-    }
-
-    function dlRenderLegend() {
-      const el = document.getElementById("tpDlLegend");
-      if (!el) return;
-      if (!dlTp.selected.size) {
-        el.innerHTML = '<div class="tp-empty">No line selected.</div>';
-        return;
-      }
-      const byId = Object.fromEntries(dlTp.catalog.map((l) => [l.lineid, l]));
-      const rows = [];
-      Array.from(dlTp.selected).sort((a, b) => {
-        const na = parseInt(a, 10), nb = parseInt(b, 10);
-        if (!isNaN(na) && !isNaN(nb)) return na - nb;
-        return String(a).localeCompare(String(b));
-      }).forEach((lid) => {
-        const line = byId[lid] || {};
-        const bg = line.route_color || DELIJN_FALLBACK_COLOR;
-        const fg = dlContrastText(bg);
-        rows.push(
-          `<div class="tp-legend-row">
-             <span class="chip-mini" style="background:${escapeHtml(bg)};color:${escapeHtml(fg)}">${escapeHtml(line.route_short_name || lid)}</span>
-             <span class="destinations">${escapeHtml(line.route_long_name || line.route_short_name || lid)}</span>
-           </div>`
-        );
-      });
-      el.innerHTML = rows.join("") || '<div class="tp-empty">No matching line metadata.</div>';
-    }
-
-    async function dlLoadCatalog() {
-      try {
-        const resp = await fetch("/api/delijn/lines");
-        const data = await resp.json();
-        dlTp.catalog = Array.isArray(data.lines) ? data.lines : [];
-      } catch (err) {
-        console.error("[delijn] failed to load /api/delijn/lines:", err);
-        dlTp.catalog = [];
-      }
-      dlRenderLineList();
-      dlRenderLegend();
-    }
-
-    // ── De Lijn event listeners ──
-    document.getElementById("tpDlToggleSegments").addEventListener("click", function () {
-      dlTp.showSegments = !dlTp.showSegments;
-      this.classList.toggle("active", dlTp.showSegments);
-      const sl = document.getElementById("tpDlSliderSegments");
-      if (sl) sl.classList.toggle("visible", dlTp.showSegments);
-      dlApplyToMap();
-    });
-    document.getElementById("tpDlToggleStops").addEventListener("click", function () {
-      dlTp.showStops = !dlTp.showStops;
-      this.classList.toggle("active", dlTp.showStops);
-      const sl = document.getElementById("tpDlSliderStops");
-      if (sl) sl.classList.toggle("visible", dlTp.showStops);
-      dlApplyToMap();
-    });
-    document.getElementById("tpDlToggleVehicles").addEventListener("click", function () {
-      dlTp.showVehicles = !dlTp.showVehicles;
-      this.classList.toggle("active", dlTp.showVehicles);
-      const sl = document.getElementById("tpDlSliderVehicles");
-      if (sl) sl.classList.toggle("visible", dlTp.showVehicles);
-      dlApplyToMap();
-    });
-    document.getElementById("tpDlToggleAlerts").addEventListener("click", function () {
-      dlTp.showAlerts = !dlTp.showAlerts;
-      this.classList.toggle("active", dlTp.showAlerts);
-      const sl = document.getElementById("tpDlSliderAlerts");
-      if (sl) sl.classList.toggle("visible", dlTp.showAlerts);
-      dlApplyToMap();
-    });
-    document.getElementById("tpDlPlayBtn").addEventListener("click", () => {
-      if (dlTp.playing) dlPausePlayer();
-      else dlStartPlayer();
-    });
-    document.getElementById("tpDlSlider").addEventListener("input", (ev) => {
-      if (dlTp.windowStartMs == null) return;
-      dlPausePlayer();
-      dlTp.playheadMs = dlTp.windowStartMs + Number(ev.target.value);
-      dlRenderVehicleFrame();
-    });
-    document.querySelectorAll(".dl-speed-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        dlTp.speed = Number(btn.getAttribute("data-speed")) || 1;
-        document.querySelectorAll(".dl-speed-btn").forEach((b) => b.classList.toggle("active", b === btn));
-      });
-    });
-    document.getElementById("tpDlSelectAll").addEventListener("click", () => {
-      dlTp.selected = new Set(dlTp.catalog.map((l) => l.lineid));
-      dlRenderLineList();
-      dlRenderLegend();
-      dlApplyToMap();
-      _lastDlAlertFetch = 0; refreshDelijnAlerts();
-    });
-    document.getElementById("tpDlSelectNone").addEventListener("click", () => {
-      dlTp.selected.clear();
-      dlRenderLineList();
-      dlRenderLegend();
-      dlApplyToMap();
-      _lastDlAlertFetch = 0; refreshDelijnAlerts();
-    });
-    document.getElementById("tpBackBtnDelijn").addEventListener("click", () => {
-      tpShowLevel("operators");
-    });
-    if (map.loaded && map.loaded()) dlLoadCatalog();
-    else map.on("load", dlLoadCatalog);
-
-    // ══════════════════════════════════════════════════════════════
-    // De Lijn Alerts (mirrors STIB alerts system)
-    // ══════════════════════════════════════════════════════════════
-    let _dlAlertSourceAdded = false;
-
-    function ensureDlAlertLayers() {
-      if (_dlAlertSourceAdded) return;
-      if (!map.loaded()) {
-        map.once("idle", () => {
-          ensureDlAlertLayers();
-          if (dlTp.showAlerts && dlTp.selected && dlTp.selected.size > 0) {
-            tpSetLayerVisibility(["delijn-alerts-pulse", "delijn-alerts-circle", "delijn-alerts-label"], true);
-            refreshDelijnAlerts();
-          }
-        });
-        return;
-      }
-      try {
-        if (map.getSource("delijn_alerts")) { _dlAlertSourceAdded = true; return; }
-        map.addSource("delijn_alerts", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: [] },
-        });
-        // Outer pulse ring (color by alert_type: slow_speed=orange, proximity=red)
-        map.addLayer({
-          id: "delijn-alerts-pulse",
-          type: "circle",
-          source: "delijn_alerts",
-          layout: { visibility: "none" },
-          paint: {
-            "circle-radius": ["match", ["get", "severity"], "high", 18, "medium", 15, 12],
-            "circle-color": ["match", ["get", "alert_type"],
-              "slow_speed", "#fb923c",
-              /* default proximity */ "#ef4444"],
-            "circle-opacity": 0.25,
-            "circle-blur": 0.8,
-          },
-        });
-        // Main alert circle
-        map.addLayer({
-          id: "delijn-alerts-circle",
-          type: "circle",
-          source: "delijn_alerts",
-          layout: { visibility: "none" },
-          paint: {
-            "circle-radius": ["match", ["get", "severity"], "high", 10, "medium", 8, 6],
-            "circle-color": ["match", ["get", "alert_type"],
-              "slow_speed", "#fb923c",
-              "#ef4444"],
-            "circle-opacity": 0.9,
-            "circle-stroke-width": 2,
-            "circle-stroke-color": "#ffffff",
-          },
-        });
-        // Alert icon
-        map.addLayer({
-          id: "delijn-alerts-label",
-          type: "symbol",
-          source: "delijn_alerts",
-          layout: {
-            visibility: "none",
-            "text-field": "!",
-            "text-size": 12,
-            "text-font": ["Noto Sans Bold"],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          },
-          paint: { "text-color": "#ffffff" },
-        });
-        _dlAlertSourceAdded = true;
-        console.log("[DELIJN_ALERTS] layers created");
-      } catch(e) { console.error("[DELIJN_ALERTS] ensureDlAlertLayers failed:", e); }
-
-      // ── Tooltip on hover ──
-      const dlAlertTt = document.getElementById("delijnAlertTooltip");
-      map.on("mouseenter", "delijn-alerts-circle", () => { map.getCanvas().style.cursor = "pointer"; });
-      map.on("mouseleave", "delijn-alerts-circle", () => {
-        map.getCanvas().style.cursor = "";
-        dlAlertTt.style.display = "none";
-      });
-      map.on("mousemove", "delijn-alerts-circle", (e) => {
-        if (!e.features || !e.features.length) return;
-        const p = e.features[0].properties;
-        let details = {};
-        try { details = typeof p.details === "string" ? JSON.parse(p.details) : (p.details || {}); } catch(_){}
-
-        const typeLabels = {
-          proximity: "Proximite anormale",
-          slow_speed: "Vitesse anormalement lente",
-          stuck: "Bus bloqué (immobile)",
-          stopped: "Bus immobile",
-          slow: "Bus lent",
-          gap: "Trou de couverture",
-          off_route: "Hors trace",
-        };
-        const bandLabels = {morning_peak:"Pointe matin", daytime:"Journée", evening_peak:"Pointe soir", evening:"Soirée", night:"Nuit"};
-        const dayLabels  = {weekday:"Lu/Ma/Je/Ve", wednesday:"Mercredi", school_vacation:"Vacances scol.", saturday:"Samedi", sunday_holiday:"Dim/Férié"};
-
-        let html = '<span class="alert-sev ' + (p.severity || "low") + '">'
-          + (p.severity || "low").toUpperCase() + '</span>'
-          + ' — ' + (typeLabels[p.alert_type] || p.alert_type)
-          + '<br>Ligne <b>' + (p.route_short_name || p.route_id || "?") + '</b> (De Lijn)';
-
-        if (p.alert_type === "proximity") {
-          html += '<br>Distance: <b>' + (details.haversine_distance_m != null ? details.haversine_distance_m : "?") + ' m</b>';
-          if (p.vehicle_id_a && p.vehicle_id_b) {
-            html += '<br>Vehicules: ' + p.vehicle_id_a + ' ↔ ' + p.vehicle_id_b;
-          }
-        } else if (p.alert_type === "slow_speed") {
-          const obs = details.observed_kmh, plan = details.planned_kmh, ratio = details.ratio;
-          html += '<br>Vitesse: <b>' + (obs != null ? obs : "?") + ' km/h</b>'
-               + ' / <b>' + (plan != null ? plan : "?") + ' km/h</b> attendu';
-          if (ratio != null) {
-            const pct = Math.round(ratio * 100);
-            html += ' <span class="alert-detail">(' + pct + '%)</span>';
-          }
-          if (details.time_band) {
-            const dayStr = details.day_type ? (dayLabels[details.day_type] || details.day_type) + ' · ' : '';
-            html += '<br><span class="alert-detail">' + dayStr + (bandLabels[details.time_band] || details.time_band) + '</span>';
-          }
-          if (details.stop_a_id && details.stop_b_id) {
-            html += '<div class="alert-detail">Segment ' + details.stop_a_id + ' → ' + details.stop_b_id + '</div>';
-          }
-          if (p.vehicle_id_a) {
-            html += '<div class="alert-detail">Véhicule ' + p.vehicle_id_a + '</div>';
-          }
-        } else if (p.alert_type === "stuck") {
-          html += '<br><b>Immobile</b> depuis l\'émission (jitter < ' + (details.jitter_m != null ? details.jitter_m : "?") + ' m)';
-          html += '<div class="alert-detail">Fenêtre: ' + (details.window_s || 180) + 's · ' + (details.fresh_samples || "?") + ' samples</div>';
-          if (p.vehicle_id_a) {
-            html += '<div class="alert-detail">Véhicule ' + p.vehicle_id_a + '</div>';
-          }
-        } else if (p.alert_type === "stopped") {
-          html += '<div class="alert-detail">Immobile depuis ' + (details.stopped_since_s || "?") + 's</div>';
-        } else if (p.alert_type === "slow") {
-          html += '<div class="alert-detail">Vitesse: ' + (details.current_speed_kmh || "?") + ' km/h</div>';
-        }
-
-        if (p.detected_at) {
-          try {
-            html += '<div class="alert-detail">' + new Date(p.detected_at).toLocaleTimeString("fr-BE") + '</div>';
-          } catch(_){}
-        }
-
-        dlAlertTt.innerHTML = html;
-        dlAlertTt.style.display = "block";
-        dlAlertTt.style.left = (e.point.x + 12) + "px";
-        dlAlertTt.style.top  = (e.point.y - 12) + "px";
-      });
-    }
-
-    // Refresh De Lijn alerts from API
-    let _lastDlAlertFetch = 0;
-    let _allDlAlerts = [];
-
-    function renderDlAlertFrame() {
-      if (!_dlAlertSourceAdded) return;
-      const ph = dlTp.playheadMs != null ? dlTp.playheadMs : Date.now();
-
-      // Same O(log N) binary-search strategy as STIB. _allDlAlerts is
-      // maintained sorted by _det_ms ASC with precomputed timestamps.
-      const lo = _lowerBoundDet(_allDlAlerts, ph - ALERT_DISPLAY_DURATION_MS);
-      const hi = _lowerBoundDet(_allDlAlerts, ph + 1);
-
-      const visible = [];
-      for (let i = lo; i < hi; i++) {
-        const a = _allDlAlerts[i];
-        const end = a._resolved_ms != null
-          ? Math.min(a._resolved_ms, a._det_ms + ALERT_DISPLAY_DURATION_MS)
-          : a._det_ms + ALERT_DISPLAY_DURATION_MS;
-        if (end >= ph) {
-          if (_transportMetricFilter === "all" || a.alert_type === _transportMetricFilter) {
-            visible.push(a);
-          }
-        }
-      }
-
-      const fc = {
-        type: "FeatureCollection",
-        features: visible.map(a => ({
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [a.lon, a.lat] },
-          properties: a,
-        })),
-      };
-      map.getSource("delijn_alerts")?.setData(fc);
-    }
-
-    async function refreshDelijnAlerts() {
-      if (!_dlAlertSourceAdded) return;
-      const now = Date.now();
-      if (now - _lastDlAlertFetch < 15000) return;
-      _lastDlAlertFetch = now;
-      try {
-        const tq = currentTimeQuery();
-        const params = new URLSearchParams(tq);
-        params.set("active", "1");
-        if (dlTp.selected && dlTp.selected.size > 0) {
-          params.set("lines", Array.from(dlTp.selected).join(","));
-        }
-        const resp = await fetch("/api/delijn/alerts?" + params);
-        const data = await resp.json();
-        if (!data.ok) return;
-        _allDlAlerts = _indexAlerts(
-          (data.alerts || []).filter(a => a.lon != null && a.lat != null)
-        );
-        renderDlAlertFrame();
-      } catch (err) {
-        console.warn("[DELIJN_ALERTS] fetch failed:", err);
-      }
-    }
-
-    // Trigger De Lijn alerts on map load
-    if (map.loaded && map.loaded()) { ensureDlAlertLayers(); }
-    else map.on("load", () => { ensureDlAlertLayers(); });
   </script>
 
   <script>
@@ -5166,20 +3628,12 @@
 
     const BADGE = {
       stib_stop:     { cls: "stib",   icon: "A" },
-      delijn_stop:   { cls: "delijn", icon: "A" },
       stib_line:     { cls: "line",   icon: "L" },
-      delijn_line:   { cls: "line",   icon: "L" },
-      xtream_camera: { cls: "camera", icon: "C" },
-      traffic_light: { cls: "tl",     icon: "F" },
     };
 
     const ZOOM = {
       stib_stop:     17,
-      delijn_stop:   17,
       stib_line:     14,
-      delijn_line:   14,
-      xtream_camera: 18,
-      traffic_light: 18,
     };
 
     let _debounce = null;

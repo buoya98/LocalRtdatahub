@@ -434,14 +434,13 @@ Then re-run the relevant ingestor.
 **Removed** (out of scope or dependent on credentialed external APIs):
 
 - De Lijn, TomTom, Waze, ANPR, traffic-light, FLIR — backend routes
-  removed entirely. The frontend still references some of these layers
-  but their fetches now return 404; the affected UI panels degrade
-  silently. A full frontend trim is planned next.
+  AND frontend code removed. The map is STIB-only.
 - Azure / Kafka ingestors (ANPR, Magneto, …)
 - SSH/QGIS tunnel and corporate network configuration
-- The upstream `index.html` (≈5300 lines) is kept almost verbatim — the
-  local copy is ~5265 lines, with Mapbox GL JS swapped for MapLibre
-  GL JS (drop-in compatible).
+- The upstream `index.html` (≈5300 lines) was trimmed to ~3700 lines
+  (-29%): Mapbox GL JS swapped for MapLibre GL JS (drop-in compatible),
+  all non-STIB operator panels / layers / fetches removed. SNCB and TEC
+  are kept as disabled placeholders.
 
 ---
 
