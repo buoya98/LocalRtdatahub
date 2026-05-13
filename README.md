@@ -242,11 +242,24 @@ data/bench_algo_data/
     └── wt.jsonl.gz                     #   waiting times
 ```
 
-The `positions/` and `waiting_times/` trees ship with the repo. The
-`runs/<run-name>/tables/` tree is optional — it holds the output of the
-matching algorithm (positions with lat/lon already resolved). If you
+A 7-day sample of raw STIB position dumps ships with the repo under
+`data/bench_algo_data/positions/` (2026-05-04 → 2026-05-10, ~85 MB total).
+Enough to play with the pipeline end-to-end on a fresh clone.
+
+`waiting_times/` dumps are **not** shipped (each one is 150-163 MB,
+which exceeds GitHub's 100 MB per-file hard limit). To populate
+`transport_local.stib_waiting_time` locally, either collect your own
+from the STIB ODP `/rt/waitingTimes` feed or load the equivalent
+`wt.jsonl.gz` from a `runs/<run-name>/tables/` directory.
+
+The `runs/<run-name>/tables/` tree is optional — it holds the output of
+the matching algorithm (positions with lat/lon already resolved). If you
 have such an `assignments.csv.gz`, the ingestor will use it directly
 without going through the SQL transform.
+
+To grab fresh data live from the API, see §5.a (the live ingestor can
+also mirror its polls to `data/raw/stib/` so you can replay them later
+via the bench path).
 
 ```bash
 # Whole tree at once (auto-detects each file by name)

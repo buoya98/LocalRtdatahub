@@ -8,3 +8,16 @@ venv/
 .idea/
 .vscode/
 *.log
+
+# Bench data: ship a 7-day sample of raw positions only.
+# waiting_times files are 150+ MB each (above GitHub's 100 MB hard limit)
+# so they're kept out of the repo entirely.
+data/bench_algo_data/waiting_times/
+data/bench_algo_data/positions/*
+!data/bench_algo_data/positions/2026-05-04.jsonl.gz
+!data/bench_algo_data/positions/2026-05-05.jsonl.gz
+!data/bench_algo_data/positions/2026-05-06.jsonl.gz
+!data/bench_algo_data/positions/2026-05-07.jsonl.gz
+!data/bench_algo_data/positions/2026-05-08.jsonl.gz
+!data/bench_algo_data/positions/2026-05-09.jsonl.gz
+!data/bench_algo_data/positions/2026-05-10.jsonl.gz
