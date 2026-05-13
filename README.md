@@ -390,36 +390,6 @@ psql "postgresql://rtdatahub:rtdatahub@localhost:5432/rtdatahub_local" -c "
 
 Then re-run the relevant ingestor.
 
-### Migrating from a pre-rename `rt_v2.*` DB
-
-Earlier versions of this project used a `rt_v2` schema (matching the
-upstream's now-retired v2 shadow). The schema has been renamed to
-`rt` to match upstream's current naming. If you have an existing DB
-populated under `rt_v2.*`, rename it in-place — no data loss:
-
-```bash
-psql "postgresql://rtdatahub:rtdatahub@localhost:5432/rtdatahub_local" <<'EOF'
-ALTER SCHEMA rt_v2 RENAME TO rt;
--- Old index names keep their old labels; drop them so a fresh
--- schema.sql re-run can recreate them with the new names cleanly.
-DROP INDEX IF EXISTS rt.idx_v2_stib_pos_lineid;
-DROP INDEX IF EXISTS rt.idx_v2_stib_pos_fetched;
-DROP INDEX IF EXISTS rt.idx_v2_stib_pos_geom;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_lineid;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_end;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_lastpt;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_gist;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_open_lineid_start;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_lineid;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_start;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_end;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_gist;
-DROP INDEX IF EXISTS rt.idx_v2_stib_trip_lineid_start;
-EOF
-
-psql ... -f sql/schema.sql   # re-creates the new-named indexes + view
-```
-
 ---
 
 ## 8. Troubleshooting
