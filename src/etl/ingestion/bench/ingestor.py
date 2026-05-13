@@ -292,6 +292,14 @@ def _iter_jsonl(path: Path) -> Iterator[dict]:
                 continue
 
 
+def _batch_or_skip(name: str, batch: list, path: Path) -> int:
+    """Log a warning when a static dump yielded no usable rows (likely
+    malformed input) and return 0 so the caller short-circuits."""
+    if not batch:
+        log.warning("  -> 0 rows after filtering — %s in %s", name, path)
+    return len(batch)
+
+
 def ingest_static_stops(conn, path: Path) -> int:
     sql = """
         INSERT INTO static.stib_stop (pointid, stop_name_fr, stop_name_nl, geom, updated_at)
@@ -303,14 +311,18 @@ def ingest_static_stops(conn, path: Path) -> int:
             updated_at   = NOW();
     """
     template = "(%s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), NOW())"
-    batch = [
-        (r["pointid"], r.get("stop_name_fr"), r.get("stop_name_nl"),
-         r["lon"], r["lat"])
-        for r in _iter_jsonl(path) if r.get("pointid")
-    ]
-    with conn.cursor() as cur:
-        execute_values(cur, sql, batch, template=template, page_size=INGEST_BATCH_SIZE)
-    return len(batch)
+    batch = []
+    for r in _iter_jsonl(path):
+        pid = r.get("pointid")
+        lon, lat = r.get("lon"), r.get("lat")
+        if pid is None or lon is None or lat is None:
+            continue
+        batch.append((pid, r.get("stop_name_fr"), r.get("stop_name_nl"), lon, lat))
+    n = _batch_or_skip("stops", batch, path)
+    if n:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, batch, template=template, page_size=INGEST_BATCH_SIZE)
+    return n
 
 
 def ingest_static_line_stops(conn, path: Path) -> int:
@@ -323,14 +335,18 @@ def ingest_static_line_stops(conn, path: Path) -> int:
             destination = EXCLUDED.destination,
             updated_at = NOW();
     """
-    batch = [
-        (r["lineid"], r["direction"], r["sequence_idx"], r["pointid"],
-         r.get("destination"))
-        for r in _iter_jsonl(path)
-    ]
-    with conn.cursor() as cur:
-        execute_values(cur, sql, batch, page_size=INGEST_BATCH_SIZE)
-    return len(batch)
+    batch = []
+    for r in _iter_jsonl(path):
+        lineid, direction, seq, pid = (r.get("lineid"), r.get("direction"),
+                                        r.get("sequence_idx"), r.get("pointid"))
+        if lineid is None or direction is None or seq is None or pid is None:
+            continue
+        batch.append((lineid, direction, seq, pid, r.get("destination")))
+    n = _batch_or_skip("line_stops", batch, path)
+    if n:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, batch, page_size=INGEST_BATCH_SIZE)
+    return n
 
 
 def ingest_static_line_terminus(conn, path: Path) -> int:
@@ -343,13 +359,18 @@ def ingest_static_line_terminus(conn, path: Path) -> int:
             destination = EXCLUDED.destination,
             updated_at = NOW();
     """
-    batch = [
-        (r["lineid"], r["terminus_pointid"], r["direction"], r.get("destination"))
-        for r in _iter_jsonl(path)
-    ]
-    with conn.cursor() as cur:
-        execute_values(cur, sql, batch, page_size=INGEST_BATCH_SIZE)
-    return len(batch)
+    batch = []
+    for r in _iter_jsonl(path):
+        lineid, term, direction = (r.get("lineid"), r.get("terminus_pointid"),
+                                    r.get("direction"))
+        if lineid is None or term is None or direction is None:
+            continue
+        batch.append((lineid, term, direction, r.get("destination")))
+    n = _batch_or_skip("line_terminus", batch, path)
+    if n:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, batch, page_size=INGEST_BATCH_SIZE)
+    return n
 
 
 def ingest_static_line_shapes(conn, path: Path) -> int:
@@ -368,14 +389,19 @@ def ingest_static_line_shapes(conn, path: Path) -> int:
         "(%s, %s, %s, %s, %s, %s, "
         "ST_SetSRID(ST_GeomFromText(%s), 4326))"
     )
-    batch = [
-        (r["lineid"], r["direction"], r.get("variant"), r.get("mode"),
-         r.get("route_color"), r.get("route_text_color"), r["geom_wkt"])
-        for r in _iter_jsonl(path) if r.get("geom_wkt")
-    ]
-    with conn.cursor() as cur:
-        execute_values(cur, sql, batch, template=template, page_size=INGEST_BATCH_SIZE)
-    return len(batch)
+    batch = []
+    for r in _iter_jsonl(path):
+        lineid, direction, wkt = (r.get("lineid"), r.get("direction"),
+                                   r.get("geom_wkt"))
+        if lineid is None or direction is None or not wkt:
+            continue
+        batch.append((lineid, direction, r.get("variant"), r.get("mode"),
+                      r.get("route_color"), r.get("route_text_color"), wkt))
+    n = _batch_or_skip("line_shapes", batch, path)
+    if n:
+        with conn.cursor() as cur:
+            execute_values(cur, sql, batch, template=template, page_size=INGEST_BATCH_SIZE)
+    return n
 
 
 _STATIC_DISPATCH = {
@@ -399,7 +425,7 @@ def main() -> int:
             "  # Just the raw positions\n"
             "  python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/\n\n"
             "  # Single file\n"
-            "  python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/2026-05-01.jsonl.gz\n"
+            "  python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/2026-05-04.jsonl.gz\n"
         ),
     )
     parser.add_argument(

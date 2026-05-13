@@ -50,9 +50,14 @@ The whole stack is:
    /gtfs/feed/stibmivb…   │                 │                     │
                           │   ┌─────────────▼───────────────┐     │
    data/bench_algo_data/  │──▶│ bench/ingestor.py  (replay) │     │
-   ├ positions/*.jsonl.gz │   │   • assignments.csv.gz      │     │
-   ├ waiting_times/*…     │   │   • positions/*.jsonl.gz    │     │
-   └ runs/*/assignments…  │   │   • wt.jsonl.gz             │     │
+   ├ static/*.jsonl.gz    │   │   • static/stops.jsonl.gz   │     │
+   │  (catalogue, shipped)│   │   • static/line_stops…       │     │
+   ├ positions/*.jsonl.gz │   │   • static/line_terminus…   │     │
+   │  (7-day sample,      │   │   • static/line_shapes…     │     │
+   │   shipped)           │   │   • positions/*.jsonl.gz    │     │
+   └ runs/*/{assignments, │   │   • assignments.csv.gz      │     │
+     wt}.jsonl.gz         │   │   • wt.jsonl.gz             │     │
+     (optional, BYO)      │   │     (both optional)         │     │
                           │   └─────────────┬───────────────┘     │
                           └─────────────────┼─────────────────────┘
                                             │
@@ -187,7 +192,7 @@ stay drop-in compatible with upstream's queries.
 
 | Table                                | Purpose                                            | Written by                                                                            | Read by                                                  | Schema lines |
 | ------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------ |
-| `transport_local.stib_waiting_time`  | ETAs replayed from `wt.jsonl.gz`                   | [bench/ingestor.py:193-232](../src/etl/ingestion/bench/ingestor.py)                   | [waiting_times.py:13-36](../src/map/server/services/waiting_times.py) | [146-156](../sql/schema.sql) |
+| `transport_local.stib_waiting_time`  | ETAs replayed from `wt.jsonl.gz` (optional — not shipped: daily files exceed GitHub's per-file limit, BYO)   | [bench/ingestor.py](../src/etl/ingestion/bench/ingestor.py) `ingest_waiting_times` | [waiting_times.py:13-36](../src/map/server/services/waiting_times.py) | [146-156](../sql/schema.sql) |
 
 This schema is the only one with no upstream equivalent — upstream
 serves waiting times from a separate Azure Service Bus pipeline.
@@ -261,17 +266,21 @@ $ python -m src.etl.ingestion.bench.ingestor <path>...
    _walk(paths)             (bench/ingestor.py:77-87)
             │                ├ recursively yields *.jsonl.gz / *.csv.gz
             ▼
-   _classify(path)          (bench/ingestor.py:63-74)
+   _classify(path)          (bench/ingestor.py)
             │
-   ┌────────┼──────────────────────────────────┐
-   │        │                                  │
-   ▼        ▼                                  ▼
-assignments  waiting_times                     positions
-   │        │                                  │
-   │        ▼                                  ▼
-   │  ingest_waiting_times                ingest_raw_positions
-   │  (:193-232)                          (:235-254)
-   │   • parses JSONL                      • parses JSONL
+   ┌────────┼──────────────┬──────────────────┐
+   │        │              │                  │
+   ▼        ▼              ▼                  ▼
+static_*  assignments   waiting_times      positions
+   │        │              │                  │
+   ▼        │              ▼                  ▼
+ingest_static_{stops, |  ingest_waiting_times  ingest_raw_positions
+  line_stops, line_   │   • parses JSONL       • parses JSONL
+  terminus,           │                       • feeds insert_positions()
+  line_shapes}        │                          (shared with live path)
+   • parses JSONL     │
+   • execute_values   │
+     batch upsert     │
    │   • bulk INSERT into                  • passes records to
    │     transport_local.stib_waiting_time   insert_positions(...)
    │                                         (same fn as live API)
@@ -287,21 +296,29 @@ ingest_assignments  (:106-172)
      static.stib_stop  (_upsert_stops, :175-190)
 ```
 
-Three file types are routed differently because **they carry different
+Five file types are routed differently because **they carry different
 information**:
 
+- **`static/{stops,line_stops,line_terminus,line_shapes}.jsonl.gz`** —
+  pre-exported STIB catalogue (shipped with the repo, ~420 KB total).
+  Each maps 1:1 to a `static.stib_*` table; the bench ingestor upserts
+  them in dependency order via `_KIND_ORDER` (stops →
+  line_stops → line_terminus → line_shapes). Lets a fresh clone
+  bootstrap without a `STIB_ODP_KEY`.
 - **`positions/*.jsonl.gz`** — raw STIB feed (same shape as the live
   API payload, minus the outer wrapper). No GPS coordinates. Pushed
   through the same `insert_positions` transform as the live path
-  ([bench/ingestor.py:254](../src/etl/ingestion/bench/ingestor.py)). This
+  ([bench/ingestor.py](../src/etl/ingestion/bench/ingestor.py)). This
   is the parity guarantee the README mentions: *same transform, same
   position_id, same rows*.
-- **`waiting_times/*.jsonl.gz`** / `wt.jsonl.gz` — ETAs only. Goes to
-  `transport_local.stib_waiting_time`, no geometry involved.
+- **`waiting_times/*.jsonl.gz`** / `wt.jsonl.gz` — ETAs only,
+  populates `transport_local.stib_waiting_time`. **Not shipped**
+  (single-day files exceed GitHub's 100 MB per-file limit); the
+  ingestor still handles them if you bring your own.
 - **`assignments.csv.gz`** — output of an offline matching algorithm
   (bench runs). Already has resolved `latitude` / `longitude` and its
   *own* `position_id` column, so it bypasses the transform entirely.
-  [bench/ingestor.py:148](../src/etl/ingestion/bench/ingestor.py) keeps
+  [bench/ingestor.py](../src/etl/ingestion/bench/ingestor.py) keeps
   the CSV's `position_id` verbatim instead of recomputing one — that's
   on purpose so two ingests of the same run produce stable rows even
   when the CSV's distance was rounded differently from the raw feed.
@@ -798,7 +815,9 @@ counts are the canonical pulse:
   position table is full but the map is empty because the Flask
   service reads from `rt.stib_trip_all`, not from
   `stib_vehicle_position`.
-- `waiting_times == 0` → expected unless you ingested `wt.jsonl.gz`.
+- `waiting_times == 0` → expected on a fresh clone — none ship with
+  the repo. Bring your own `wt.jsonl.gz` or `waiting_times/*.jsonl.gz`
+  and re-run the bench ingestor to populate.
 
 ### Silent failure modes
 

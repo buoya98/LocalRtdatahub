@@ -3,9 +3,10 @@
 -- Mirrors the upstream RTDataHub layout (rt.stib_*, static.stib_*) so
 -- service queries port over verbatim. Scope: Transport-only standalone
 -- (bench dumps + STIB GTFS static data).
-
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS mobilitydb CASCADE;
+--
+-- The PostGIS + MobilityDB extensions must already be installed (the
+-- README §3 does that as the `postgres` superuser before invoking this
+-- file). Running schema.sql is idempotent — every CREATE uses IF NOT EXISTS.
 
 CREATE SCHEMA IF NOT EXISTS static;
 CREATE SCHEMA IF NOT EXISTS rt;
@@ -13,8 +14,10 @@ CREATE SCHEMA IF NOT EXISTS transport_local;
 
 
 -- ============================================================
--- STATIC reference tables — populated by the upstream STIB ODP ingestors
--- (scripts/ingest_gtfs.sh) and as a side-effect of ingest_bench.py.
+-- STATIC reference tables — populated by `bench/ingestor.py` from the
+-- shipped data/bench_algo_data/static/*.jsonl.gz, or by the live
+-- `stib/ingestor.py {stops,lines,shapes}` steps when an STIB_ODP_KEY
+-- is available.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS static.stib_stop (
@@ -85,7 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_stib_pos_geom    ON rt.stib_vehicle_position USIN
 
 
 -- ============================================================
--- TRIP tables — populated by scripts/build_trips.py via greedy
+-- TRIP tables — populated by src/etl/pipeline/load/load_stib.py via greedy
 -- spatial+temporal assignment of rt.stib_vehicle_position.
 -- Schema follows the upstream `rt` layout (MobilityDB tgeompoint).
 -- ============================================================

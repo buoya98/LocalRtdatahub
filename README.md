@@ -155,8 +155,9 @@ psql "postgresql://rtdatahub:rtdatahub@localhost:5432/rtdatahub_local" \
   -c "\dt rt.*"
 ```
 
-You should see `stib_vehicle_position` and `stib_trip` (created by
-[sql/schema.sql](sql/schema.sql)).
+You should see three tables (`stib_vehicle_position`, `stib_trip`,
+`stib_trip_open`) and one view (`stib_trip_all`), all created by
+[sql/schema.sql](sql/schema.sql).
 
 ---
 
@@ -228,11 +229,13 @@ Requires `STIB_ODP_KEY` in `.env`. Get one at
 <https://opendata.stib-mivb.be/>. Skip this section if you're happy with
 the shipped sample.
 
-> ⚠️ **Step ordering matters.** `stops` populates `static.stib_stop` →
-> `lines` populates `static.stib_line_terminus` → `shapes` reads both
-> and populates `static.stib_line_shape`. The default invocation runs
-> them in order; running `shapes` alone before `lines` silently
-> inserts nothing.
+> ⚠️ **Step ordering matters (ODP path only).** `stops` populates
+> `static.stib_stop` → `lines` populates `static.stib_line_terminus` →
+> `shapes` reads both and populates `static.stib_line_shape`. The
+> default invocation runs them in order; running `shapes` alone before
+> `lines` silently inserts nothing. The bench replay path (§5.a) is
+> immune to this — `_KIND_ORDER` in the ingestor enforces the same
+> dependency order automatically.
 
 ```bash
 # Refresh the static catalogue from the ODP (re-runs once GTFS changes)
@@ -275,7 +278,7 @@ python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/
 python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/
 
 # A single file
-python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/2026-05-01.jsonl.gz
+python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/2026-05-04.jsonl.gz
 ```
 
 File-type auto-detection:
@@ -375,7 +378,7 @@ Available endpoints:
 | `GET /api/stib/stop/<pointid>`                     | Stop info + lines serving it                        |
 | `GET /api/stib/alerts`                             | Empty (no upstream alert pipeline locally)          |
 | `GET /api/search?q=…`                              | Unified search across stops + lines                 |
-| `GET /api/waiting-times?pointid=1775`              | ETA per stop (used by the popup)                    |
+| `GET /api/waiting-times?pointid=1775`              | ETA per stop. **Returns `[]` until you ingest your own `waiting_times/*.jsonl.gz` or `wt.jsonl.gz` dumps** — none ship with the repo (each daily file is 150+ MB, above GitHub's per-file limit). |
 | `GET /tiles/<layer>/<z>/<x>/<y>.pbf`               | MVT vector tiles (`stib_lines`, `stib_stops`)        |
 | `GET /debug/counts`                                | Row counts per table (debug)                        |
 
@@ -406,7 +409,7 @@ Then re-run the relevant ingestor.
 | -------------------------------------------------- | --------------------------------------------------------------------------- |
 | `extension "mobilitydb" is not available`          | Build didn't install the extension into `/usr/lib/postgresql/18/`. Recompile forcing `PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config`. |
 | `psql: error: connection refused`                  | `sudo systemctl start postgresql`; check `pg_isready`.                      |
-| `permission denied for schema rt`                  | Re-run `sql/schema.sql` as the `rtdatahub` user after creating it.          |
+| `permission denied for schema rt`                  | The schemas got created by a different role (e.g. `postgres`). Make sure the `psql` invocation that loaded `sql/schema.sql` used the `rtdatahub` user (`psql "postgresql://rtdatahub:rtdatahub@…"`), so `rt`, `static` and `transport_local` are owned by it. |
 | Empty map                                          | `/api/health` should report `mobilitydb: true`. If yes, check `/api/stib/lines` (empty DB → re-run an ingestor).                          |
 | Conda shadows the system `psql`                    | `conda deactivate` or use the absolute path `/usr/lib/postgresql/18/bin/psql`. |
 | `STIB_ODP_KEY environment variable is not set`     | Add `STIB_ODP_KEY=…` to `.env` (request a key on the STIB Open Data Portal). |
