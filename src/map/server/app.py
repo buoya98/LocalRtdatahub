@@ -47,6 +47,11 @@ def create_app(cfg: ServerConfig, pool: Pool) -> Flask:
         os.path.join(os.path.dirname(__file__), "..", "templates")
     )
     app = Flask(__name__, template_folder=template_dir)
+    # Reload index.html on disk changes — this is a dev-style local server
+    # and the cost (a stat() per request to "/") is negligible. Without it,
+    # template edits silently require a server restart.
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
+    app.jinja_env.auto_reload = True
     ctx = MapAppContext(cfg, pool)
 
     # ── HTTP-level wiring (gzip, cache, etc.) ─────────────────────────

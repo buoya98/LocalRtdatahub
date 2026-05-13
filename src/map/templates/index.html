@@ -1075,9 +1075,16 @@
 
     const params = new URLSearchParams(window.location.search);
     const defaultHours = parseFloat("{{ hours }}");
-    const startParam = params.get("start");
-    const endParam = params.get("end");
-    let mode = (startParam && endParam) ? "range" : "relative";
+    // Default window matches the shipped sample
+    // (data/bench_algo_data/positions/2026-05-04.jsonl.gz). UTC, so a CEST
+    // browser will see "02:00" in the time-picker inputs — the underlying
+    // ISO timestamps the API receives are unambiguous. Override the
+    // defaults with ?start=YYYY-MM-DDTHH:MM:SSZ&end=... in the URL.
+    const DEFAULT_START_ISO = "2026-05-04T00:00:00Z";
+    const DEFAULT_END_ISO   = "2026-05-05T00:00:00Z";
+    const startParam = params.get("start") || DEFAULT_START_ISO;
+    const endParam = params.get("end") || DEFAULT_END_ISO;
+    let mode = "range";
     let hours = parseFloat(params.get("hours") || String(defaultHours));
     if (!Number.isFinite(hours) || hours <= 0) {
       hours = defaultHours;
