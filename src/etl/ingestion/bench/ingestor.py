@@ -2,27 +2,27 @@
 
 Auto-detects file type from filename:
 
-  * assignments.csv.gz             → rt.stib_vehicle_position
-        Columns: position_id, fetched_at_utc, timestamp_s, lineId,
-                 direction, pointId, distance, latitude, longitude, obs_id
-        These rows already carry resolved lat/lon, so we insert them with
-        ST_MakePoint(lon, lat). Observed pointids are upserted into
-        static.stib_stop as a side-effect (best-effort centroid).
+  * static/stops.jsonl.gz          → static.stib_stop
+  * static/line_stops.jsonl.gz     → static.stib_line_stops
+  * static/line_terminus.jsonl.gz  → static.stib_line_terminus
+  * static/line_shapes.jsonl.gz    → static.stib_line_shape
+        Pre-extracted STIB catalogue. Lets a fresh clone bootstrap the
+        whole pipeline without needing a STIB ODP API key. Ordering is
+        enforced (stops → line_stops → line_terminus → line_shapes).
 
   * positions/*.jsonl.gz           → rt.stib_vehicle_position
         Raw STIB feed: {poll_ts, lineid, directionId, pointId,
                         distanceFromPoint} — no GPS. Geom is reconstructed
         in SQL from static.stib_line_shape + static.stib_stop via
-        src/etl/pipeline/transform/stib_transform.py (same path as the
-        live API ingestor — feed-format parity is what makes both modes
-        produce identical rows).
+        src/etl/pipeline/transform/stib_transform.py.
 
-  * waiting_times/*.jsonl.gz       → transport_local.stib_waiting_time
-        Columns: poll_ts, pointid, lineid, expected, destination, message
+  * assignments.csv.gz             → rt.stib_vehicle_position
+        Bench-algo output that already carries resolved lat/lon.
+        Inserted directly with ST_MakePoint(lon, lat).
 
 Raw inputs are read-only — every dump is opened with gzip.open(..., "rb")
 and never modified, renamed, or moved. Re-running the ingestor on the
-same files only re-tries inserts (ON CONFLICT (position_id) DO NOTHING).
+same files only re-tries inserts (ON CONFLICT … DO NOTHING / DO UPDATE).
 
 Run with:
     python -m src.etl.ingestion.bench.ingestor PATH [PATH ...]
@@ -65,6 +65,11 @@ def _classify(path: Path) -> str:
     parts = {p.lower() for p in path.parts}
     if name.startswith("assignments") and name.endswith(".csv.gz"):
         return "assignments"
+    if "static" in parts and name.endswith(".jsonl.gz"):
+        # Static catalogue files — each one maps to one static.stib_* table.
+        stem = name[: -len(".jsonl.gz")]
+        if stem in ("stops", "line_stops", "line_terminus", "line_shapes"):
+            return f"static_{stem}"
     if name.startswith("wt") and name.endswith(".jsonl.gz"):
         return "waiting_times"
     if "waiting_times" in parts and name.endswith(".jsonl.gz"):
@@ -72,6 +77,22 @@ def _classify(path: Path) -> str:
     if "positions" in parts and name.endswith(".jsonl.gz"):
         return "positions"
     return "unknown"
+
+
+# Enforce FK-respecting load order: stops first (referenced by everything),
+# then line_stops + line_terminus (the latter is read by line_shapes via the
+# direction label), then line_shapes. positions/assignments last because they
+# read line_shape/stop to resolve geom.
+_KIND_ORDER = {
+    "static_stops":         0,
+    "static_line_stops":    1,
+    "static_line_terminus": 2,
+    "static_line_shapes":   3,
+    "assignments":          4,
+    "positions":            4,
+    "waiting_times":        5,
+    "unknown":              99,
+}
 
 
 def _walk(paths: Iterable[Path]) -> Iterator[Path]:
@@ -254,6 +275,117 @@ def ingest_raw_positions(conn, path: Path) -> int:
     return insert_positions(conn, _records(), batch_size=INGEST_BATCH_SIZE)
 
 
+# ------------------------ Static catalogue replay ---------------------------
+# Replays a pre-extracted STIB catalogue from the .jsonl.gz files shipped in
+# data/bench_algo_data/static/. Same end-state as running the STIB ODP
+# ingestors (stops + lines + shapes), without needing a STIB_ODP_KEY.
+
+def _iter_jsonl(path: Path) -> Iterator[dict]:
+    with _open_text_gz(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                yield json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+
+def ingest_static_stops(conn, path: Path) -> int:
+    sql = """
+        INSERT INTO static.stib_stop (pointid, stop_name_fr, stop_name_nl, geom, updated_at)
+        VALUES %s
+        ON CONFLICT (pointid) DO UPDATE SET
+            stop_name_fr = EXCLUDED.stop_name_fr,
+            stop_name_nl = EXCLUDED.stop_name_nl,
+            geom         = EXCLUDED.geom,
+            updated_at   = NOW();
+    """
+    template = "(%s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), NOW())"
+    batch = [
+        (r["pointid"], r.get("stop_name_fr"), r.get("stop_name_nl"),
+         r["lon"], r["lat"])
+        for r in _iter_jsonl(path) if r.get("pointid")
+    ]
+    with conn.cursor() as cur:
+        execute_values(cur, sql, batch, template=template, page_size=INGEST_BATCH_SIZE)
+    return len(batch)
+
+
+def ingest_static_line_stops(conn, path: Path) -> int:
+    sql = """
+        INSERT INTO static.stib_line_stops
+            (lineid, direction, sequence_idx, pointid, destination)
+        VALUES %s
+        ON CONFLICT (lineid, direction, sequence_idx) DO UPDATE SET
+            pointid = EXCLUDED.pointid,
+            destination = EXCLUDED.destination,
+            updated_at = NOW();
+    """
+    batch = [
+        (r["lineid"], r["direction"], r["sequence_idx"], r["pointid"],
+         r.get("destination"))
+        for r in _iter_jsonl(path)
+    ]
+    with conn.cursor() as cur:
+        execute_values(cur, sql, batch, page_size=INGEST_BATCH_SIZE)
+    return len(batch)
+
+
+def ingest_static_line_terminus(conn, path: Path) -> int:
+    sql = """
+        INSERT INTO static.stib_line_terminus
+            (lineid, terminus_pointid, direction, destination)
+        VALUES %s
+        ON CONFLICT (lineid, terminus_pointid) DO UPDATE SET
+            direction = EXCLUDED.direction,
+            destination = EXCLUDED.destination,
+            updated_at = NOW();
+    """
+    batch = [
+        (r["lineid"], r["terminus_pointid"], r["direction"], r.get("destination"))
+        for r in _iter_jsonl(path)
+    ]
+    with conn.cursor() as cur:
+        execute_values(cur, sql, batch, page_size=INGEST_BATCH_SIZE)
+    return len(batch)
+
+
+def ingest_static_line_shapes(conn, path: Path) -> int:
+    sql = """
+        INSERT INTO static.stib_line_shape
+            (lineid, direction, variant, mode, route_color, route_text_color, geom)
+        VALUES %s
+        ON CONFLICT (lineid, direction) DO UPDATE SET
+            variant = EXCLUDED.variant,
+            mode = EXCLUDED.mode,
+            route_color = EXCLUDED.route_color,
+            route_text_color = EXCLUDED.route_text_color,
+            geom = EXCLUDED.geom;
+    """
+    template = (
+        "(%s, %s, %s, %s, %s, %s, "
+        "ST_SetSRID(ST_GeomFromText(%s), 4326))"
+    )
+    batch = [
+        (r["lineid"], r["direction"], r.get("variant"), r.get("mode"),
+         r.get("route_color"), r.get("route_text_color"), r["geom_wkt"])
+        for r in _iter_jsonl(path) if r.get("geom_wkt")
+    ]
+    with conn.cursor() as cur:
+        execute_values(cur, sql, batch, template=template, page_size=INGEST_BATCH_SIZE)
+    return len(batch)
+
+
+_STATIC_DISPATCH = {
+    "static_stops":         ingest_static_stops,
+    "static_line_stops":    ingest_static_line_stops,
+    "static_line_terminus": ingest_static_line_terminus,
+    "static_line_shapes":   ingest_static_line_shapes,
+}
+
+
 # -------------------------------- Main --------------------------------------
 
 def main() -> int:
@@ -280,7 +412,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    total = {"assignments": 0, "raw_positions": 0, "waiting_times": 0, "skipped": 0}
+    total = {"static": 0, "assignments": 0, "raw_positions": 0,
+             "waiting_times": 0, "skipped": 0}
 
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = False
@@ -290,10 +423,20 @@ def main() -> int:
             log.error("no .jsonl.gz / .csv.gz files found in %s", args.paths)
             return 1
 
-        for path in sorted(files):
+        # Static catalogue first (stops → line_stops → line_terminus →
+        # line_shapes), then positions/assignments, then waiting_times.
+        # See _KIND_ORDER for the priority table.
+        ordered = sorted(files, key=lambda p: (_KIND_ORDER.get(_classify(p), 99), p.name))
+
+        for path in ordered:
             kind = _classify(path)
             log.info("%s -> %s", path, kind)
-            if kind == "assignments":
+            if kind in _STATIC_DISPATCH:
+                n = _STATIC_DISPATCH[kind](conn, path)
+                conn.commit()
+                total["static"] += n
+                log.info("  -> %d %s rows upserted", n, kind.replace("static_", ""))
+            elif kind == "assignments":
                 n = ingest_assignments(conn, path)
                 conn.commit()
                 total["assignments"] += n
@@ -318,8 +461,9 @@ def main() -> int:
     finally:
         conn.close()
 
-    log.info("Done. assignments=%d, raw_positions=%d, waiting_times=%d, skipped=%d",
-             total["assignments"], total["raw_positions"],
+    log.info("Done. static=%d, assignments=%d, raw_positions=%d, "
+             "waiting_times=%d, skipped=%d",
+             total["static"], total["assignments"], total["raw_positions"],
              total["waiting_times"], total["skipped"])
     return 0
 

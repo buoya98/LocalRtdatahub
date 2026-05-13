@@ -182,32 +182,63 @@ cp .env.example .env
 
 ## 5. Data ingestion
 
-Two input paths share the same transform and write **identical rows** to
-`rt.stib_vehicle_position`. Records are deduplicated by a deterministic
-`position_id` (SHA-256 of `lineid|direction|pointid|fetched_at|distance`),
-so re-running on overlapping data is idempotent.
+The repo ships with everything needed to populate the DB **without an
+API key**: a pre-extracted STIB catalogue (~420 KB) + 7 days of raw
+vehicle positions (~85 MB). One command loads the lot.
 
-### 5.a — Live API (STIB Open Data Portal)
-
-Requires `STIB_ODP_KEY` in `.env`. Get one at
-<https://opendata.stib-mivb.be/>.
-
-> ⚠️ **Step ordering matters.** Each step depends on the previous one:
->
-> 1. `stops` populates `static.stib_stop` (read by `lines` and `shapes`)
-> 2. `lines` populates `static.stib_line_terminus` (read by `shapes`)
-> 3. `shapes` populates `static.stib_line_shape` (read by `rt` to compute geom)
->
-> The default `python -m src.etl.ingestion.stib.ingestor` invocation runs
-> them in the correct order. Running `shapes` alone before `lines` will
-> silently insert nothing.
+### 5.a — Quick start: bench replay from the shipped sample
 
 ```bash
-# Static reference data (stops, lines, shapes) — run once, then on GTFS update
-python -m src.etl.ingestion.stib.ingestor             # all three steps in order
-python -m src.etl.ingestion.stib.ingestor stops       # single step (advanced)
+python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/
+```
 
-# Live vehicle positions (requires the static steps above to have run first)
+This auto-detects every `.jsonl.gz` / `.csv.gz` under the tree, loads
+the static catalogue first (stops → line_stops → line_terminus →
+line_shapes), then the vehicle positions. Idempotent: re-running on the
+same files only re-tries inserts (`ON CONFLICT … DO NOTHING / DO UPDATE`).
+
+Repository data layout:
+
+```
+data/bench_algo_data/
+├── static/                              # STIB catalogue (~420 KB total)
+│   ├── stops.jsonl.gz                   # static.stib_stop
+│   ├── line_stops.jsonl.gz              # static.stib_line_stops
+│   ├── line_terminus.jsonl.gz           # static.stib_line_terminus
+│   └── line_shapes.jsonl.gz             # static.stib_line_shape (geom_wkt)
+└── positions/YYYY-MM-DD.jsonl.gz        # raw STIB feed, 7-day sample
+```
+
+You can also feed individual files or sub-trees:
+
+```bash
+# Just the static catalogue (refresh the static.* tables)
+python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/static/
+
+# Just one day of positions
+python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/2026-05-07.jsonl.gz
+```
+
+> Raw inputs are **read-only**: the ingestor opens every file with
+> `gzip.open(path, "rb")`. Nothing is renamed, moved or written back.
+
+### 5.b — Live API (optional, refreshes catalogue + collects new positions)
+
+Requires `STIB_ODP_KEY` in `.env`. Get one at
+<https://opendata.stib-mivb.be/>. Skip this section if you're happy with
+the shipped sample.
+
+> ⚠️ **Step ordering matters.** `stops` populates `static.stib_stop` →
+> `lines` populates `static.stib_line_terminus` → `shapes` reads both
+> and populates `static.stib_line_shape`. The default invocation runs
+> them in order; running `shapes` alone before `lines` silently
+> inserts nothing.
+
+```bash
+# Refresh the static catalogue from the ODP (re-runs once GTFS changes)
+python -m src.etl.ingestion.stib.ingestor             # stops + lines + shapes
+
+# Poll live vehicle positions
 python -m src.etl.ingestion.stib.ingestor rt                    # one poll → DB
 python -m src.etl.ingestion.stib.ingestor rt --interval 20      # loop forever
 
@@ -219,53 +250,28 @@ python -m src.etl.ingestion.stib.ingestor rt --interval 20 \
        --output data/raw/stib/
 ```
 
-The ODP feed has no GPS coordinates — geom is reconstructed in SQL from
-`static.stib_line_shape` + `static.stib_stop` via
+The ODP live feed has no GPS coordinates — geom is reconstructed in
+SQL from `static.stib_line_shape` + `static.stib_stop` via
 [src/etl/pipeline/transform/stib_transform.py](src/etl/pipeline/transform/stib_transform.py)
-(`ST_LineLocatePoint` + `ST_LineInterpolatePoint`). If the static tables
-are empty when `rt` runs, observations are silently dropped (LEFT JOIN
-filter) — check `/debug/counts` after a poll to spot this.
+(`ST_LineLocatePoint` + `ST_LineInterpolatePoint`). If the static
+tables are empty when `rt` runs, observations are silently dropped —
+check `/debug/counts` after a poll to spot this.
 
-### 5.b — Raw `.jsonl.gz` / `.csv.gz` dumps
+The raw `positions/*.jsonl.gz` dumps share that exact transform, so a
+fresh clone using only §5.a writes the same rows in
+`rt.stib_vehicle_position` as a live ODP poll would have.
 
-The `bench_algo_data` dumps (raw STIB feed or bench output) are
-**read-only** — never modified, renamed or moved.
+`assignments.csv.gz` (under `runs/<run-name>/tables/`) is an optional
+third format: it carries lat/lon already resolved and is inserted
+directly with `ST_MakePoint(lon, lat)` — no transform.
 
-Expected layout:
-
-```
-data/bench_algo_data/
-├── positions/YYYY-MM-DD.jsonl.gz       # raw STIB feed (no coords)
-├── waiting_times/YYYY-MM-DD.jsonl.gz   # raw waiting times
-└── runs/<run-name>/tables/             # optional: bench-algo output
-    ├── assignments.csv.gz              #   positions with resolved lat/lon
-    └── wt.jsonl.gz                     #   waiting times
-```
-
-A 7-day sample of raw STIB position dumps ships with the repo under
-`data/bench_algo_data/positions/` (2026-05-04 → 2026-05-10, ~85 MB total).
-Enough to play with the pipeline end-to-end on a fresh clone.
-
-`waiting_times/` dumps are **not** shipped (each one is 150-163 MB,
-which exceeds GitHub's 100 MB per-file hard limit). To populate
-`transport_local.stib_waiting_time` locally, either collect your own
-from the STIB ODP `/rt/waitingTimes` feed or load the equivalent
-`wt.jsonl.gz` from a `runs/<run-name>/tables/` directory.
-
-The `runs/<run-name>/tables/` tree is optional — it holds the output of
-the matching algorithm (positions with lat/lon already resolved). If you
-have such an `assignments.csv.gz`, the ingestor will use it directly
-without going through the SQL transform.
-
-To grab fresh data live from the API, see §5.a (the live ingestor can
-also mirror its polls to `data/raw/stib/` so you can replay them later
-via the bench path).
+Records are deduplicated by a deterministic `position_id` (SHA-256 of
+`lineid|direction|pointid|fetched_at|distance`), so any mix of paths is
+idempotent.
 
 ```bash
-# Whole tree at once (auto-detects each file by name)
+# Recap — common invocations
 python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/
-
-# Just the raw positions (calls the same SQL transform as the live API)
 python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/
 
 # A single file
@@ -274,11 +280,14 @@ python -m src.etl.ingestion.bench.ingestor data/bench_algo_data/positions/2026-0
 
 File-type auto-detection:
 
-| File                                        | Target                                                                  |
-| ------------------------------------------- | ----------------------------------------------------------------------- |
-| `assignments.csv.gz`                        | `rt.stib_vehicle_position` (lat/lon already present)                 |
-| `positions/*.jsonl.gz`                      | `rt.stib_vehicle_position` (geom computed like the live API path)    |
-| `wt.jsonl.gz` or `waiting_times/*.jsonl.gz` | `transport_local.stib_waiting_time`                                     |
+| File                              | Target                                                                  |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| `static/stops.jsonl.gz`           | `static.stib_stop`                                                      |
+| `static/line_stops.jsonl.gz`      | `static.stib_line_stops`                                                |
+| `static/line_terminus.jsonl.gz`   | `static.stib_line_terminus`                                             |
+| `static/line_shapes.jsonl.gz`     | `static.stib_line_shape` (geom from WKT)                                |
+| `positions/*.jsonl.gz`            | `rt.stib_vehicle_position` (geom computed like the live API path)       |
+| `assignments.csv.gz`              | `rt.stib_vehicle_position` (lat/lon already present)                    |
 
 > ⚠️ **No-overwrite guarantee.** Raw `.jsonl.gz` files are never touched.
 > The bench ingestor opens them read-only (`gzip.open(path, "rb")`). The
@@ -383,8 +392,7 @@ Loading new `.jsonl.gz` every day? Start from a clean DB:
 psql "postgresql://rtdatahub:rtdatahub@localhost:5432/rtdatahub_local" -c "
   TRUNCATE rt.stib_vehicle_position,
            rt.stib_trip,
-           rt.stib_trip_open,
-           transport_local.stib_waiting_time;
+           rt.stib_trip_open;
 "
 ```
 
